@@ -1,0 +1,69 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+
+import '../../../../core/constants/api_constants.dart';
+import '../../../../core/errors/failures.dart';
+import '../models/match_model.dart';
+
+abstract class MatchRemoteDatasource {
+  Future<List<MatchModel>> getMatches({List<String>? leagueIds});
+}
+
+class MatchRemoteDatasourceImpl implements MatchRemoteDatasource {
+  MatchRemoteDatasourceImpl(this._dio);
+
+  final Dio _dio;
+
+  @override
+  Future<List<MatchModel>> getMatches({List<String>? leagueIds}) async {
+    final now = DateTime.now().toUtc();
+    final end = now.add(const Duration(days: 90));
+
+    final variables = jsonEncode({
+      'hl': 'en-US',
+      'sport': 'lol',
+      'eventDateStart': now.toIso8601String(),
+      'eventDateEnd': end.toIso8601String(),
+      'leagues': leagueIds ?? kLeagueIds.values.toList(),
+      'eventState': ['inProgress', 'completed', 'unstarted'],
+      'pageSize': 300,
+      'eventType': 'match',
+    });
+
+    final extensions = jsonEncode({
+      'persistedQuery': {
+        'version': 1,
+        'sha256Hash': kGqlHash,
+      },
+    });
+
+    final response = await _dio.get<Map<String, dynamic>>(
+      kLolesportsBaseUrl,
+      queryParameters: {
+        'operationName': 'homeEvents',
+        'variables': variables,
+        'extensions': extensions,
+      },
+      options: Options(
+        headers: kLolesportsHeaders,
+        followRedirects: true,
+        receiveTimeout: const Duration(seconds: 10),
+        sendTimeout: const Duration(seconds: 10),
+      ),
+    );
+
+    final data = response.data?['data'] as Map<String, dynamic>?;
+    if (response.statusCode != 200 || data == null) {
+      throw const ServerFailure('Invalid response from lolesports API');
+    }
+
+    final events =
+        (data['schedule']['events'] as List<dynamic>?) ?? <dynamic>[];
+
+    return events
+        .cast<Map<String, dynamic>>()
+        .map(MatchModel.fromJson)
+        .toList();
+  }
+}
