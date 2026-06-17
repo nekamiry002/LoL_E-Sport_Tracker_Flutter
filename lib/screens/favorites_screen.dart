@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
+import '../features/matches/presentation/providers/match_provider.dart';
 import '../providers/app_provider.dart';
-import '../widgets/hex_logo.dart';
+import '../widgets/team_logo.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
@@ -126,20 +127,23 @@ class _FavoritesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final matchProvider = context.read<MatchProvider>();
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 26),
       itemCount: favIds.length,
       itemBuilder: (_, i) {
-        final team = MockData.team(favIds[i]);
-        return _FavoriteCard(team: team);
+        final favId = favIds[i];
+        final team = matchProvider.teamFor(favId);
+        return _FavoriteCard(team: team, favId: favId);
       },
     );
   }
 }
 
 class _FavoriteCard extends StatelessWidget {
-  const _FavoriteCard({required this.team});
+  const _FavoriteCard({required this.team, required this.favId});
   final TeamData team;
+  final String favId;
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +151,7 @@ class _FavoriteCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
         onTap: () =>
-            Navigator.pushNamed(context, '/team', arguments: team.id),
+            Navigator.pushNamed(context, '/team', arguments: favId),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -183,7 +187,7 @@ class _FavoriteCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
                 child: Row(
                   children: [
-                    HexLogo(size: 50, gradient: team.gradient, mono: team.mono),
+                    TeamLogo(team: team, size: 50),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -219,7 +223,7 @@ class _FavoriteCard extends StatelessWidget {
                     GestureDetector(
                       onTap: () => context
                           .read<AppProvider>()
-                          .toggleFavorite(team.id),
+                          .toggleFavorite(favId),
                       behavior: HitTestBehavior.opaque,
                       child: Padding(
                         padding: const EdgeInsets.all(6),
@@ -277,7 +281,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 26),
             GestureDetector(
-              onTap: () => context.read<AppProvider>().goHome(),
+              onTap: () => context.read<AppProvider>().goTeams(),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 28, vertical: 13),

@@ -1,8 +1,12 @@
 const String kLolesportsBaseUrl = 'https://lolesports.com/api/gql';
 
+const String kEsportsApiBaseUrl = 'https://esports-api.lolesports.com/persisted/gw';
+const String kEsportsApiKey = '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
+
 const String kGqlHash =
     '7246add6f577cf30b304e651bf9e25fc6a41fe49aeafb0754c16b5778060fc0a';
 
+// Full headers for native (Android/iOS/macOS/Windows/Linux).
 const Map<String, String> kLolesportsHeaders = {
   'User-Agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0',
@@ -21,11 +25,23 @@ const Map<String, String> kLolesportsHeaders = {
   'Sec-GPC': '1',
 };
 
+// Web-safe subset: browsers block the "forbidden" headers above.
+const Map<String, String> kLolesportsHeadersWeb = {
+  'Accept': '*/*',
+  'Accept-Language': 'fr,fr-FR;q=0.7,en;q=0.3',
+  'content-type': 'application/json',
+  'apollographql-client-name': 'Esports Web',
+  'apollographql-client-version': '04afdab',
+};
+
 const Map<String, String> kLeagueIds = {
-  'emea_masters': '100695891328981122',
-  'first_stand': '113464388705111224',
+  'lck': '98767991310872058',
+  'lpl': '98767991314006698',
+  'lcs': '98767991299243165',
+  'lec': '98767991302996019',
   'msi': '98767975604431411',
   'worlds': '98767991325878492',
-  'lec': '98767991302996019',
+  'emea_masters': '100695891328981122',
   'lfl': '105266103462388553',
+  'first_stand': '113464388705111224',
 };

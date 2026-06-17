@@ -9,6 +9,8 @@ class TeamData {
     required this.region,
     required this.color1,
     required this.color2,
+    this.apiId = '',
+    this.imageUrl = '',
   });
 
   final String id;
@@ -17,6 +19,8 @@ class TeamData {
   final String region;
   final Color color1;
   final Color color2;
+  final String apiId;
+  final String imageUrl;
 
   Gradient get gradient => RadialGradient(
         center: const Alignment(-0.36, -0.48),
@@ -94,6 +98,29 @@ class MatchResultData {
       : AppColors.liveRed.withValues(alpha: 0.14);
 }
 
+class HistoryMatchData {
+  const HistoryMatchData({
+    required this.team1Id,
+    required this.team2Id,
+    required this.league,
+    required this.bo,
+    required this.score1,
+    required this.score2,
+    required this.dateLabel,
+  });
+
+  final String team1Id;
+  final String team2Id;
+  final String league;
+  final String bo;
+  final int score1;
+  final int score2;
+  final String dateLabel;
+
+  bool get team1Won => score1 > score2;
+  String get scoreText => '$score1 - $score2';
+}
+
 class StatTile {
   const StatTile({required this.label, required this.value, required this.color});
   final String label;
@@ -122,6 +149,7 @@ class MatchDisplayData {
     required this.league,
     required this.bo,
     required this.isLive,
+    this.isCompleted = false,
     this.team1Wins = 0,
     this.team2Wins = 0,
     this.game,
@@ -129,6 +157,7 @@ class MatchDisplayData {
     this.scheduledText,
     this.isHeadLive = false,
     this.isHeadUpcoming = false,
+    this.isHeadCompleted = false,
   });
 
   final String id;
@@ -137,6 +166,7 @@ class MatchDisplayData {
   final String league;
   final String bo;
   final bool isLive;
+  final bool isCompleted;
   final int team1Wins;
   final int team2Wins;
   final String? game;
@@ -144,14 +174,24 @@ class MatchDisplayData {
   final String? scheduledText;
   final bool isHeadLive;
   final bool isHeadUpcoming;
+  final bool isHeadCompleted;
 
-  String get centerText => isLive ? '$team1Wins - $team2Wins' : 'VS';
-  Color get centerColor => isLive ? AppColors.primary : AppColors.textMuted;
+  String get centerText =>
+      (isLive || isCompleted) ? '$team1Wins - $team2Wins' : 'VS';
+  Color get centerColor =>
+      isLive ? AppColors.primary : AppColors.textMuted;
   String get subText =>
       isLive ? (game ?? '') : 'Best of ${bo.substring(2)}';
-  String get statusText => isLive ? 'LIVE' : (scheduledText ?? '');
-  Color get statusColor =>
-      isLive ? AppColors.liveRedLight : AppColors.textSecondary;
+  String get statusText => isLive
+      ? 'LIVE'
+      : isCompleted
+          ? 'FINAL'
+          : (scheduledText ?? '');
+  Color get statusColor => isLive
+      ? AppColors.liveRedLight
+      : isCompleted
+          ? AppColors.textMuted
+          : AppColors.textSecondary;
   Color get statusBg => isLive
       ? AppColors.liveRed.withValues(alpha: 0.16)
       : Colors.white.withValues(alpha: 0.05);
@@ -299,6 +339,33 @@ class MockData {
 
   static List<MatchDisplayData> get allMatches =>
       [...liveMatches, ...upcomingMatches];
+
+  static const historyMatches = <HistoryMatchData>[
+    HistoryMatchData(
+        team1Id: 't1', team2Id: 'geng', league: 'LCK', bo: 'BO5',
+        score1: 3, score2: 1, dateLabel: 'YESTERDAY — JUN 16'),
+    HistoryMatchData(
+        team1Id: 'jdg', team2Id: 'blg', league: 'LPL', bo: 'BO3',
+        score1: 1, score2: 2, dateLabel: 'YESTERDAY — JUN 16'),
+    HistoryMatchData(
+        team1Id: 'g2', team2Id: 'fnc', league: 'LEC', bo: 'BO3',
+        score1: 2, score2: 1, dateLabel: 'SAT — JUN 14'),
+    HistoryMatchData(
+        team1Id: 'c9', team2Id: 'tl', league: 'LCS', bo: 'BO5',
+        score1: 3, score2: 0, dateLabel: 'SAT — JUN 14'),
+    HistoryMatchData(
+        team1Id: 't1', team2Id: 'jdg', league: 'Worlds', bo: 'BO5',
+        score1: 3, score2: 2, dateLabel: 'THU — JUN 12'),
+    HistoryMatchData(
+        team1Id: 'kt', team2Id: 'hle', league: 'LCK', bo: 'BO5',
+        score1: 2, score2: 1, dateLabel: 'THU — JUN 12'),
+    HistoryMatchData(
+        team1Id: 'blg', team2Id: 'fnc', league: 'Worlds', bo: 'BO5',
+        score1: 2, score2: 0, dateLabel: 'WED — JUN 10'),
+    HistoryMatchData(
+        team1Id: 'geng', team2Id: 'c9', league: 'Worlds', bo: 'BO5',
+        score1: 3, score2: 1, dateLabel: 'WED — JUN 10'),
+  ];
 
   static const defaultRoster = <PlayerData>[
     PlayerData(name: 'Apex', role: 'Top', kda: '4.1'),
