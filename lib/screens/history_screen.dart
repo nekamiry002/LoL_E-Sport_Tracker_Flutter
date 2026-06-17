@@ -16,6 +16,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String _filter = 'ALL';
+  DateTimeRange? _dateRange;
 
   @override
   void initState() {
@@ -28,9 +29,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
+  Future<void> _pickDateRange() async {
+    final provider = context.read<HistoryProvider>();
+    final matches = provider.matches;
+    final earliest = matches.isNotEmpty ? matches.last.startTime : DateTime(2024);
+    final latest = matches.isNotEmpty ? matches.first.startTime : DateTime.now();
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(earliest.year, earliest.month, earliest.day),
+      lastDate: DateTime(latest.year, latest.month, latest.day),
+      initialDateRange: _dateRange,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.primary,
+            onPrimary: Colors.black,
+            surface: Color(0xFF1A1A2E),
+            onSurface: AppColors.textPrimary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() => _dateRange = picked);
+    }
+  }
+
   List<HistoryMatch> _filtered(List<HistoryMatch> all) {
-    if (_filter == 'ALL') return all;
-    return all.where((m) => m.leagueName == _filter).toList();
+    var list = all;
+    if (_filter != 'ALL') {
+      list = list.where((m) => m.leagueName == _filter).toList();
+    }
+    if (_dateRange != null) {
+      final start = _dateRange!.start;
+      final end = _dateRange!.end;
+      list = list.where((m) {
+        final d = m.startTime;
+        return !d.isBefore(DateTime(start.year, start.month, start.day)) &&
+            !d.isAfter(DateTime(end.year, end.month, end.day, 23, 59, 59));
+      }).toList();
+    }
+    return list;
   }
 
   List<String> _dateGroups(List<HistoryMatch> matches) {
@@ -46,7 +88,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Column(
       children: [
-        _Header(count: filtered.length),
+        _Header(
+          count: filtered.length,
+          hasDateFilter: _dateRange != null,
+          onCalendarTap: _pickDateRange,
+          onClearDate: () => setState(() => _dateRange = null),
+        ),
         _LeagueFilter(
           leagues: leagues,
           selected: _filter,
@@ -93,8 +140,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.count});
+  const _Header({
+    required this.count,
+    required this.hasDateFilter,
+    required this.onCalendarTap,
+    required this.onClearDate,
+  });
   final int count;
+  final bool hasDateFilter;
+  final VoidCallback onCalendarTap;
+  final VoidCallback onClearDate;
 
   @override
   Widget build(BuildContext context) {
@@ -126,18 +181,44 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.calendar_today_outlined,
-              color: AppColors.textSecondary,
-              size: 18,
+          GestureDetector(
+            onTap: hasDateFilter ? onClearDate : onCalendarTap,
+            child: Stack(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: hasDateFilter
+                        ? AppColors.primary.withValues(alpha: 0.15)
+                        : Colors.white.withValues(alpha: 0.04),
+                    border: Border.all(
+                      color: hasDateFilter
+                          ? AppColors.primary.withValues(alpha: 0.6)
+                          : Colors.white.withValues(alpha: 0.07),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    hasDateFilter ? Icons.close : Icons.calendar_today_outlined,
+                    color: hasDateFilter ? AppColors.primary : AppColors.textSecondary,
+                    size: 18,
+                  ),
+                ),
+                if (hasDateFilter)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
