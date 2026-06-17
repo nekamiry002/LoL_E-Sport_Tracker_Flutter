@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'app.dart';
 import 'features/auth/auth_factory.dart';
@@ -25,7 +28,9 @@ void main() async {
     NotificationService.instance.init(),
   ]);
 
-  await registerBackgroundTask();
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    await registerBackgroundTask();
+  }
 
   runApp(App(
     appProvider: appProvider,
