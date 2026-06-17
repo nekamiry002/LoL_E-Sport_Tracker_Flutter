@@ -90,6 +90,12 @@ List<MatchDisplayData> adaptMatches(
 
   return sorted.map((m) {
     // Register teams (skip TBD placeholders and academy/secondary teams)
+    if (m.team1Code.isNotEmpty && m.team1Code != 'TBD' && _isAcademyTeam(m.team1Name)) {
+      debugPrint('[DEBUG] adaptMatches FILTERED academy: "${m.team1Name}" (${m.team1Code})');
+    }
+    if (m.team2Code.isNotEmpty && m.team2Code != 'TBD' && _isAcademyTeam(m.team2Name)) {
+      debugPrint('[DEBUG] adaptMatches FILTERED academy: "${m.team2Name}" (${m.team2Code})');
+    }
     if (m.team1Code.isNotEmpty && m.team1Code != 'TBD' && !_isAcademyTeam(m.team1Name)) {
       teamRegistry.putIfAbsent(
         m.team1Code,

@@ -102,18 +102,21 @@ class MatchProvider extends ChangeNotifier {
           }
         }
         if (changed) notifyListeners();
-      } catch (_) {
-        // Skip failed leagues silently
+      } catch (e) {
+        debugPrint('[DEBUG] _fetchAllSeasonTeams error for ${entry.key}: $e');
       }
     }
-    // getSchedule doesn't return numeric team IDs — backfill them from
-    // historical homeEvents data (past 9 months of completed matches).
+    debugPrint('[DEBUG] Registry after schedule (${teamRegistry.length} teams): ${teamRegistry.keys.toList()}');
+    debugPrint('[DEBUG] Teams with empty apiId: ${teamRegistry.entries.where((e) => e.value.apiId.isEmpty).map((e) => e.key).toList()}');
     await _fillMissingTeamIds();
   }
 
   Future<void> _fillMissingTeamIds() async {
     final ds = _matchDatasource;
-    if (ds == null) return;
+    if (ds == null) {
+      debugPrint('[DEBUG] _fillMissingTeamIds: no matchDatasource, skipping');
+      return;
+    }
     try {
       final now = DateTime.now().toUtc();
       final ids = await ds.getTeamIds(
@@ -121,6 +124,7 @@ class MatchProvider extends ChangeNotifier {
         endDate: now,
         leagueIds: kLeagueIds.values.toList(),
       );
+      debugPrint('[DEBUG] getTeamIds returned ${ids.length} entries: ${ids.keys.toList()}');
       var changed = false;
       for (final entry in ids.entries) {
         final existing = teamRegistry[entry.key];
@@ -138,9 +142,10 @@ class MatchProvider extends ChangeNotifier {
           changed = true;
         }
       }
+      debugPrint('[DEBUG] After fillMissing — teams still without apiId: ${teamRegistry.entries.where((e) => e.value.apiId.isEmpty).map((e) => e.key).toList()}');
       if (changed) notifyListeners();
-    } catch (_) {
-      // Silent failure — roster stays unavailable for affected teams
+    } catch (e) {
+      debugPrint('[DEBUG] _fillMissingTeamIds error: $e');
     }
   }
 
