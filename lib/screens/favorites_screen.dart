@@ -277,7 +277,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 26),
             GestureDetector(
-              onTap: () => context.read<AppProvider>().goHome(),
+              onTap: () => context.read<AppProvider>().goTeams(),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 28, vertical: 13),
