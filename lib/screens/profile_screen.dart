@@ -490,8 +490,6 @@ void _showAboutDialog(BuildContext context) {
 class _SettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<AppProvider>();
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       child: Column(
@@ -550,14 +548,6 @@ class _SettingsSection extends StatelessWidget {
                             color: AppColors.textMuted, size: 18),
                       ]),
                       onTap: () => _showLanguageDialog(context),
-                    ),
-                    _SettingsRow(
-                      icon: Icons.dark_mode_outlined,
-                      iconBg: AppColors.support.withValues(alpha: 0.12),
-                      iconColor: AppColors.support,
-                      label: 'Dark Mode',
-                      trailing: _DarkModeToggle(enabled: provider.darkMode),
-                      onTap: provider.toggleDarkMode,
                     ),
                     _SettingsRow(
                       icon: Icons.info_outline,
@@ -653,53 +643,6 @@ class _SettingsRow extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.05),
           ),
       ],
-    );
-  }
-}
-
-class _DarkModeToggle extends StatelessWidget {
-  const _DarkModeToggle({required this.enabled});
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 46,
-      height: 26,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        gradient: enabled
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.primaryLight, AppColors.primary],
-              )
-            : null,
-        color: enabled ? null : Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(13),
-        boxShadow: enabled
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.45),
-                  blurRadius: 12,
-                ),
-              ]
-            : null,
-      ),
-      child: AnimatedAlign(
-        duration: const Duration(milliseconds: 200),
-        alignment:
-            enabled ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: enabled ? AppColors.background : AppColors.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 }

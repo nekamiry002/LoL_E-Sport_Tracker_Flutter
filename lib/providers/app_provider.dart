@@ -16,12 +16,10 @@ class AppProvider extends ChangeNotifier {
   AppScreen _screen = AppScreen.home;
   TeamTab _teamTab = TeamTab.roster;
   Set<String> _favorites = {};
-  bool _darkMode = true;
 
   AppScreen get screen => _screen;
   TeamTab get teamTab => _teamTab;
   Set<String> get favorites => Set.unmodifiable(_favorites);
-  bool get darkMode => _darkMode;
 
   /// Loads persisted favorites from the repository. Call once at startup.
   Future<void> init() async {
@@ -87,9 +85,4 @@ class AppProvider extends ChangeNotifier {
   }
 
   bool isFavorite(String teamId) => _favorites.contains(teamId);
-
-  void toggleDarkMode() {
-    _darkMode = !_darkMode;
-    notifyListeners();
-  }
 }
