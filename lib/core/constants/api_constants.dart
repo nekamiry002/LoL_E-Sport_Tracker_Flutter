@@ -6,6 +6,7 @@ const String kEsportsApiKey = '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
 const String kGqlHash =
     '7246add6f577cf30b304e651bf9e25fc6a41fe49aeafb0754c16b5778060fc0a';
 
+// Full headers for native (Android/iOS/macOS/Windows/Linux).
 const Map<String, String> kLolesportsHeaders = {
   'User-Agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0',
@@ -22,6 +23,15 @@ const Map<String, String> kLolesportsHeaders = {
   'Sec-Fetch-Site': 'same-origin',
   'DNT': '1',
   'Sec-GPC': '1',
+};
+
+// Web-safe subset: browsers block the "forbidden" headers above.
+const Map<String, String> kLolesportsHeadersWeb = {
+  'Accept': '*/*',
+  'Accept-Language': 'fr,fr-FR;q=0.7,en;q=0.3',
+  'content-type': 'application/json',
+  'apollographql-client-name': 'Esports Web',
+  'apollographql-client-version': '04afdab',
 };
 
 const Map<String, String> kLeagueIds = {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/errors/failures.dart';
@@ -46,7 +47,7 @@ class MatchRemoteDatasourceImpl implements MatchRemoteDatasource {
         'extensions': extensions,
       },
       options: Options(
-        headers: kLolesportsHeaders,
+        headers: kIsWeb ? kLolesportsHeadersWeb : kLolesportsHeaders,
         followRedirects: true,
         receiveTimeout: const Duration(seconds: 10),
         sendTimeout: const Duration(seconds: 10),

@@ -44,6 +44,16 @@ class MatchProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    // Browsers block CORS requests to lolesports.com — use mock data on web.
+    if (kIsWeb) {
+      _displayMatches = MockData.allMatches;
+      _availableLeagues =
+          _displayMatches.map((m) => m.league).toSet().toList();
+      _status = MatchesStatus.success;
+      notifyListeners();
+      return;
+    }
+
     try {
       final matches = await _getMatches(leagueIds: leagueIds);
       teamRegistry.clear();
