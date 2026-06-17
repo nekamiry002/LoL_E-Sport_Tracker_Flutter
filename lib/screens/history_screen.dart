@@ -1,0 +1,486 @@
+import 'package:flutter/material.dart';
+import '../core/constants/app_colors.dart';
+import '../core/theme/app_theme.dart';
+import '../data/mock_data.dart';
+import '../widgets/hex_logo.dart';
+
+class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  String _filter = 'ALL';
+
+  static const _leagues = ['ALL', 'LCK', 'LPL', 'LEC', 'LCS', 'Worlds'];
+
+  List<HistoryMatchData> get _filtered => _filter == 'ALL'
+      ? MockData.historyMatches
+      : MockData.historyMatches.where((m) => m.league == _filter).toList();
+
+  List<String> get _dateGroups {
+    final seen = <String>{};
+    return _filtered.map((m) => m.dateLabel).where(seen.add).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    return Column(
+      children: [
+        _Header(count: filtered.length),
+        _LeagueFilter(
+          leagues: _leagues,
+          selected: _filter,
+          onSelect: (l) => setState(() => _filter = l),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const _EmptyState()
+              : _MatchList(groups: _dateGroups, matches: filtered),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  const _Header({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 6, 18, 14),
+      child: Row(
+        children: [
+          _HamburgerBtn(),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  'HISTORY',
+                  style: AppTheme.rajdhani(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$count RESULTS',
+                  style: AppTheme.rajdhani(
+                    fontSize: 9,
+                    letterSpacing: 2.5,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.calendar_today_outlined,
+              color: AppColors.textSecondary,
+              size: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HamburgerBtn extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Scaffold.of(context).openDrawer(),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            _Bar(color: AppColors.primary),
+            SizedBox(height: 4),
+            _Bar(color: AppColors.textPrimary),
+            SizedBox(height: 4),
+            _Bar(color: AppColors.textPrimary, width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Bar extends StatelessWidget {
+  const _Bar({required this.color, this.width = 18});
+  final Color color;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: 2,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+}
+
+// ── League filter chips ───────────────────────────────────────────────────────
+
+class _LeagueFilter extends StatelessWidget {
+  const _LeagueFilter({
+    required this.leagues,
+    required this.selected,
+    required this.onSelect,
+  });
+  final List<String> leagues;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: leagues.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final l = leagues[i];
+          final active = l == selected;
+          final color =
+              l == 'ALL' ? AppColors.primary : AppColors.leagueColor(l);
+          return GestureDetector(
+            onTap: () => onSelect(l),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: active
+                    ? color.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.04),
+                border: Border.all(
+                  color: active
+                      ? color.withValues(alpha: 0.6)
+                      : Colors.white.withValues(alpha: 0.07),
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                l,
+                style: AppTheme.rajdhani(
+                  fontSize: 12,
+                  fontWeight:
+                      active ? FontWeight.w700 : FontWeight.w500,
+                  letterSpacing: 1.5,
+                  color: active ? color : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Match list (grouped by date) ──────────────────────────────────────────────
+
+class _MatchList extends StatelessWidget {
+  const _MatchList({required this.groups, required this.matches});
+  final List<String> groups;
+  final List<HistoryMatchData> matches;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
+      itemCount: groups.length,
+      itemBuilder: (_, i) {
+        final group = groups[i];
+        final groupMatches =
+            matches.where((m) => m.dateLabel == group).toList();
+        return _DateSection(dateLabel: group, matches: groupMatches);
+      },
+    );
+  }
+}
+
+class _DateSection extends StatelessWidget {
+  const _DateSection({required this.dateLabel, required this.matches});
+  final String dateLabel;
+  final List<HistoryMatchData> matches;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 10),
+          child: Row(
+            children: [
+              Text(
+                dateLabel,
+                style: AppTheme.rajdhani(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 2,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Divider(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  thickness: 1,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...matches.map(
+          (m) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _ResultCard(match: m),
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+// ── Result card ───────────────────────────────────────────────────────────────
+
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({required this.match});
+  final HistoryMatchData match;
+
+  @override
+  Widget build(BuildContext context) {
+    final team1 = MockData.team(match.team1Id);
+    final team2 = MockData.team(match.team2Id);
+    final leagueColor = AppColors.leagueColor(match.league);
+
+    return GestureDetector(
+      onTap: () =>
+          Navigator.pushNamed(context, '/team', arguments: team1.id),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2,
+              child: ColoredBox(color: leagueColor.withValues(alpha: 0.7)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: leagueColor.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          match.league,
+                          style: AppTheme.rajdhani(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                            color: leagueColor,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        match.bo,
+                        style: AppTheme.barlow(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            HexLogo(
+                                size: 40,
+                                gradient: team1.gradient,
+                                mono: team1.mono),
+                            const SizedBox(width: 10),
+                            Flexible(
+                              child: Text(
+                                team1.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTheme.rajdhani(
+                                  fontSize: 15,
+                                  fontWeight: match.team1Won
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: match.team1Won
+                                      ? AppColors.textPrimary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color:
+                                AppColors.primary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.primary
+                                  .withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Text(
+                            match.scoreText,
+                            style: AppTheme.rajdhani(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                team2.name,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.end,
+                                style: AppTheme.rajdhani(
+                                  fontSize: 15,
+                                  fontWeight: !match.team1Won
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: !match.team1Won
+                                      ? AppColors.textPrimary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            HexLogo(
+                                size: 40,
+                                gradient: team2.gradient,
+                                mono: team2.mono),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.history,
+            size: 56,
+            color: AppColors.textMuted.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'NO RESULTS',
+            style: AppTheme.rajdhani(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+              color: AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No matches found for this filter.',
+            style: AppTheme.barlow(
+              fontSize: 14,
+              color: AppColors.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

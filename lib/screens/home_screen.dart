@@ -19,7 +19,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  CardStyle _cardStyle = CardStyle.classic;
+  CardStyle _cardStyle = CardStyle.featured;
   String _filter = 'ALL';
 
   List<MatchDisplayData> get _filteredMatches {
@@ -476,75 +476,83 @@ class CompactMatchCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          border: Border(
-            left: BorderSide(
-                color: AppColors.leagueColor(match.league), width: 3),
-            top: BorderSide(color: AppColors.border),
-            right: BorderSide(color: AppColors.border),
-            bottom: BorderSide(color: AppColors.border),
-          ),
+          border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        clipBehavior: Clip.hardEdge,
+        child: Stack(
           children: [
-            Expanded(
-              child: Row(children: [
-                SmallHexLogo(gradient: t1.gradient, mono: t1.mono),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    t1.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.rajdhani(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ]),
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 3,
+              child: ColoredBox(color: AppColors.leagueColor(match.league)),
             ),
-            const SizedBox(width: 8),
-            Column(children: [
-              Text(
-                match.centerText,
-                style: AppTheme.rajdhani(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: match.centerColor,
-                ),
-              ),
-              Text(
-                match.statusText,
-                style: AppTheme.barlow(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                  color: match.statusColor,
-                ),
-              ),
-            ]),
-            const SizedBox(width: 8),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 11, 13, 11),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Text(
-                      t2.name,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
+                    child: Row(children: [
+                      SmallHexLogo(gradient: t1.gradient, mono: t1.mono),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          t1.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTheme.rajdhani(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(children: [
+                    Text(
+                      match.centerText,
                       style: AppTheme.rajdhani(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: match.centerColor,
                       ),
                     ),
+                    Text(
+                      match.statusText,
+                      style: AppTheme.barlow(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                        color: match.statusColor,
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            t2.name,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: AppTheme.rajdhani(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        SmallHexLogo(gradient: t2.gradient, mono: t2.mono),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 9),
-                  SmallHexLogo(gradient: t2.gradient, mono: t2.mono),
                 ],
               ),
             ),

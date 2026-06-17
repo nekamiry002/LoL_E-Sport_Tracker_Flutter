@@ -77,18 +77,18 @@ class AppDrawer extends StatelessWidget {
                         _NavItem(
                           icon: Icons.history,
                           label: 'HISTORY',
-                          isActive: false,
+                          isActive: screen == AppScreen.history,
                           onTap: () {
-                            context.read<AppProvider>().goHome();
+                            context.read<AppProvider>().goHistory();
                             Navigator.pop(context);
                           },
                         ),
                         _NavItem(
                           icon: Icons.groups_outlined,
                           label: 'TEAMS',
-                          isActive: false,
+                          isActive: screen == AppScreen.teams,
                           onTap: () {
-                            context.read<AppProvider>().goHome();
+                            context.read<AppProvider>().goTeams();
                             Navigator.pop(context);
                           },
                         ),

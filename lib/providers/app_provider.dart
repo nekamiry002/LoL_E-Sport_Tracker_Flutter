@@ -1,13 +1,19 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
+import '../features/favorites/domain/repositories/favorites_repository.dart';
 
-enum AppScreen { home, favorites, profile }
+enum AppScreen { home, history, teams, favorites, profile }
 
 enum TeamTab { roster, stats, results, next }
 
 class AppProvider extends ChangeNotifier {
+  AppProvider(this._favoritesRepository);
+
+  final FavoritesRepository _favoritesRepository;
+
   AppScreen _screen = AppScreen.home;
   TeamTab _teamTab = TeamTab.roster;
-  final Set<String> _favorites = {'t1', 'g2'};
+  Set<String> _favorites = {};
   bool _darkMode = true;
 
   AppScreen get screen => _screen;
@@ -15,8 +21,24 @@ class AppProvider extends ChangeNotifier {
   Set<String> get favorites => Set.unmodifiable(_favorites);
   bool get darkMode => _darkMode;
 
+  /// Loads persisted favorites from the repository. Call once at startup.
+  Future<void> init() async {
+    _favorites = await _favoritesRepository.loadAll();
+    notifyListeners();
+  }
+
   void goHome() {
     _screen = AppScreen.home;
+    notifyListeners();
+  }
+
+  void goHistory() {
+    _screen = AppScreen.history;
+    notifyListeners();
+  }
+
+  void goTeams() {
+    _screen = AppScreen.teams;
     notifyListeners();
   }
 
@@ -35,11 +57,14 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Optimistic toggle: updates state immediately and persists in background.
   void toggleFavorite(String teamId) {
     if (_favorites.contains(teamId)) {
       _favorites.remove(teamId);
+      unawaited(_favoritesRepository.remove(teamId));
     } else {
       _favorites.add(teamId);
+      unawaited(_favoritesRepository.add(teamId));
     }
     notifyListeners();
   }
