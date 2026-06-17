@@ -53,13 +53,18 @@ class MatchRemoteDatasourceImpl implements MatchRemoteDatasource {
       ),
     );
 
-    final data = response.data?['data'] as Map<String, dynamic>?;
-    if (response.statusCode != 200 || data == null) {
+    final body = response.data;
+    if (response.statusCode != 200 || body == null) {
       throw const ServerFailure('Invalid response from lolesports API');
     }
 
-    final events =
-        (data['schedule']['events'] as List<dynamic>?) ?? <dynamic>[];
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw const ServerFailure('Missing "data" in API response');
+
+    final esports = data['esports'] as Map<String, dynamic>?;
+    if (esports == null) throw const ServerFailure('Missing "esports" in API response');
+
+    final events = (esports['events'] as List<dynamic>?) ?? <dynamic>[];
 
     return events
         .cast<Map<String, dynamic>>()

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'features/matches/matches_setup.dart';
 import 'providers/app_provider.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/home_screen.dart';
@@ -17,12 +18,14 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppProvider(),
-      child: MaterialApp(
+      child: matchProviders(
+        child: MaterialApp(
         title: 'LOL Esport Tracker',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         onGenerateRoute: _routes,
         home: const _MainShell(),
+      ),
       ),
     );
   }

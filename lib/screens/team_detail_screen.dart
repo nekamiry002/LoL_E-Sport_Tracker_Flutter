@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
+import '../features/matches/data/datasources/team_remote_datasource.dart';
+import '../features/matches/presentation/providers/match_provider.dart';
+import '../features/matches/presentation/providers/roster_provider.dart';
+import '../features/matches/presentation/providers/team_schedule_provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/hex_logo.dart';
 import '../widgets/hex_pattern.dart';
@@ -14,7 +18,7 @@ class TeamDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final team = MockData.team(teamId);
+    final team = context.read<MatchProvider>().teamFor(teamId);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _TeamDetailBody(team: team, teamId: teamId),
@@ -66,7 +70,7 @@ class _TeamDetailBodyState extends State<_TeamDetailBody>
         controller: _tabs,
         children: [
           _RosterTab(teamId: widget.teamId),
-          const _StatsTab(),
+          _StatsTab(teamId: widget.teamId),
           _ResultsTab(teamId: widget.teamId),
           _NextMatchTab(teamId: widget.teamId),
         ],
@@ -303,23 +307,76 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
 // ─── Roster tab ───────────────────────────────────────────────────────────────
 
-class _RosterTab extends StatelessWidget {
+class _RosterTab extends StatefulWidget {
   const _RosterTab({required this.teamId});
   final String teamId;
 
   @override
+  State<_RosterTab> createState() => _RosterTabState();
+}
+
+class _RosterTabState extends State<_RosterTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final team = context.read<MatchProvider>().teamFor(widget.teamId);
+      context.read<RosterProvider>().fetchRoster(team.apiId);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: MockData.defaultRoster.length,
-      itemBuilder: (_, i) => _PlayerCard(player: MockData.defaultRoster[i]),
-    );
+    final team = context.read<MatchProvider>().teamFor(widget.teamId);
+    final roster = context.watch<RosterProvider>();
+    final status = roster.statusFor(team.apiId);
+    final players = roster.playersFor(team.apiId);
+
+    if (team.apiId.isEmpty) {
+      return _UnavailableTab(icon: Icons.people_outline, message: 'Team not found in API.');
+    }
+
+    return switch (status) {
+      RosterStatus.initial || RosterStatus.loading => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      RosterStatus.failure => _UnavailableTab(
+          icon: Icons.people_outline,
+          message: roster.errorFor(team.apiId) ?? 'Failed to load roster.',
+        ),
+      RosterStatus.success => players.isEmpty
+          ? _UnavailableTab(icon: Icons.people_outline, message: 'No players found.')
+          : ListView.builder(
+              primary: false,
+              padding: const EdgeInsets.all(16),
+              itemCount: players.length,
+              itemBuilder: (_, i) => _PlayerCard(player: players[i]),
+            ),
+    };
   }
 }
 
 class _PlayerCard extends StatelessWidget {
   const _PlayerCard({required this.player});
-  final PlayerData player;
+  final PlayerModel player;
+
+  String get _roleGlyph => switch (player.role) {
+        'top' => '▲',
+        'jungle' => '❖',
+        'mid' => '◆',
+        'bottom' => '▼',
+        'support' => '✚',
+        _ => '?',
+      };
+
+  Color get _roleColor => switch (player.role) {
+        'top' => AppColors.primaryLight,
+        'jungle' => AppColors.win,
+        'mid' => AppColors.accent,
+        'bottom' => AppColors.liveRedLight,
+        'support' => AppColors.support,
+        _ => AppColors.textMuted,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -342,19 +399,15 @@ class _PlayerCard extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: [Color(0xFF1B2540), Color(0xFF0D1626)],
               ),
-              border:
-                  Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(14),
             ),
-            alignment: Alignment.center,
-            child: Text(
-              player.initials,
-              style: AppTheme.rajdhani(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
+            clipBehavior: Clip.hardEdge,
+            child: player.imageUrl.isNotEmpty &&
+                    !player.imageUrl.contains('default-headshot')
+                ? Image.network(player.imageUrl, fit: BoxFit.cover,
+                    errorBuilder: (context, e, stack) => _initials())
+                : _initials(),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -362,30 +415,25 @@ class _PlayerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  player.name,
+                  player.summonerName,
                   style: AppTheme.rajdhani(
                     fontSize: 19,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 4),
                 Row(children: [
                   Container(
                     width: 20,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: player.roleBg,
+                      color: _roleColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      player.roleGlyph,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: player.roleColor,
-                          height: 1),
-                    ),
+                    child: Text(_roleGlyph,
+                        style: TextStyle(fontSize: 11, color: _roleColor, height: 1)),
                   ),
                   const SizedBox(width: 7),
                   Text(
@@ -401,99 +449,237 @@ class _PlayerCard extends StatelessWidget {
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                player.kda,
-                style: AppTheme.rajdhani(
-                    fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-              Text(
-                'KDA',
-                style: AppTheme.barlow(
-                  fontSize: 9,
-                  letterSpacing: 1.5,
-                  color: AppColors.textMuted,
+          if (player.firstName.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  player.firstName,
+                  style: AppTheme.barlow(fontSize: 11, color: AppColors.textMuted),
                 ),
-              ),
-            ],
-          ),
+                Text(
+                  player.lastName,
+                  style: AppTheme.barlow(fontSize: 11, color: AppColors.textMuted),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
+
+  Widget _initials() => Center(
+        child: Text(
+          player.summonerName.isNotEmpty
+              ? player.summonerName.substring(0, player.summonerName.length.clamp(0, 2)).toUpperCase()
+              : '?',
+          style: AppTheme.rajdhani(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+          ),
+        ),
+      );
 }
 
 // ─── Stats tab ────────────────────────────────────────────────────────────────
 
-class _StatsTab extends StatelessWidget {
-  const _StatsTab();
+class _StatsTab extends StatefulWidget {
+  const _StatsTab({required this.teamId});
+  final String teamId;
+
+  @override
+  State<_StatsTab> createState() => _StatsTabState();
+}
+
+class _StatsTabState extends State<_StatsTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TeamScheduleProvider>().fetchForTeam(widget.teamId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<TeamScheduleProvider>();
+    final state = provider.stateFor(widget.teamId);
+
+    if (state.status == ScheduleStatus.loading ||
+        state.status == ScheduleStatus.initial) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    if (state.status == ScheduleStatus.failure) {
+      return _UnavailableTab(
+        icon: Icons.bar_chart_outlined,
+        message: state.error ?? 'Failed to load stats.',
+      );
+    }
+
+    final record = state.record;
+    if (record == null && state.results.isEmpty) {
+      return _UnavailableTab(
+        icon: Icons.bar_chart_outlined,
+        message: 'No stats available for this team in the current season.',
+      );
+    }
+
+    final wins = record?.wins ?? 0;
+    final losses = record?.losses ?? 0;
+    final total = wins + losses;
+    final winRate = total > 0 ? (wins / total * 100).round() : 0;
+
+    // Compute current streak from sorted results (most recent first)
+    var streak = 0;
+    String streakType = '';
+    for (final m in state.results) {
+      final outcome = m.myOutcome;
+      if (streakType.isEmpty) {
+        streakType = outcome;
+        streak = 1;
+      } else if (outcome == streakType) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
     return ListView(
+      primary: false,
       padding: const EdgeInsets.all(16),
       children: [
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.6,
-          children: MockData.statTiles
-              .map((s) => _StatTile(stat: s))
-              .toList(),
+        // Win rate bar card
+        _StatCard(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'WIN RATE',
+                  style: AppTheme.barlow(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  '$winRate%',
+                  style: AppTheme.rajdhani(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: winRate >= 50 ? AppColors.win : AppColors.liveRedLight,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: total > 0 ? wins / total : 0,
+                minHeight: 8,
+                backgroundColor: AppColors.liveRed.withValues(alpha: 0.25),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.win),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$wins W',
+                  style: AppTheme.barlow(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.win,
+                  ),
+                ),
+                Text(
+                  '$losses L',
+                  style: AppTheme.barlow(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.liveRedLight,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _PerformanceCard(),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: _StatCard(
+              children: [
+                Text(
+                  'GAMES',
+                  style: AppTheme.barlow(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$total',
+                  style: AppTheme.rajdhani(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (streak > 0)
+            Expanded(
+              child: _StatCard(
+                children: [
+                  Text(
+                    'STREAK',
+                    style: AppTheme.barlow(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 2,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${streakType == 'win' ? 'W' : 'L'}$streak',
+                    style: AppTheme.rajdhani(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: streakType == 'win'
+                          ? AppColors.win
+                          : AppColors.liveRedLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ]),
+        const SizedBox(height: 20),
+        Text(
+          'Based on season record from the lolesports API.',
+          style: AppTheme.barlow(
+            fontSize: 11,
+            color: AppColors.textSubtle,
+          ),
+        ),
       ],
     );
   }
 }
 
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.stat});
-  final StatTile stat;
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.children});
+  final List<Widget> children;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            stat.value,
-            style: AppTheme.rajdhani(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-              color: stat.color,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            stat.label,
-            style: AppTheme.barlow(
-              fontSize: 10,
-              letterSpacing: 1.5,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PerformanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -505,65 +691,7 @@ class _PerformanceCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'PERFORMANCE',
-            style: AppTheme.rajdhani(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...MockData.statBars.map((b) => _StatBar(bar: b)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatBar extends StatelessWidget {
-  const _StatBar({required this.bar});
-  final StatBar bar;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                bar.label,
-                style: AppTheme.barlow(
-                  fontSize: 12,
-                  color: AppColors.textSubtle,
-                ),
-              ),
-              Text(
-                bar.value,
-                style: AppTheme.rajdhani(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: bar.color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: bar.pct,
-              minHeight: 6,
-              backgroundColor: Colors.white.withValues(alpha: 0.06),
-              valueColor: AlwaysStoppedAnimation(bar.color),
-            ),
-          ),
-        ],
+        children: children,
       ),
     );
   }
@@ -571,19 +699,61 @@ class _StatBar extends StatelessWidget {
 
 // ─── Results tab ──────────────────────────────────────────────────────────────
 
-class _ResultsTab extends StatelessWidget {
+class _ResultsTab extends StatefulWidget {
   const _ResultsTab({required this.teamId});
   final String teamId;
 
   @override
+  State<_ResultsTab> createState() => _ResultsTabState();
+}
+
+class _ResultsTabState extends State<_ResultsTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TeamScheduleProvider>().fetchForTeam(widget.teamId);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final results = MockData.resultsForTeam(teamId);
+    final provider = context.watch<TeamScheduleProvider>();
+    final state = provider.stateFor(widget.teamId);
+
+    if (state.status == ScheduleStatus.loading ||
+        state.status == ScheduleStatus.initial) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    if (state.status == ScheduleStatus.failure) {
+      return _UnavailableTab(
+        icon: Icons.history,
+        message: state.error ?? 'Failed to load results.',
+      );
+    }
+
+    if (state.results.isEmpty) {
+      return _UnavailableTab(
+        icon: Icons.history,
+        message: 'No completed matches found for this team.',
+      );
+    }
+
     return ListView.builder(
+      primary: false,
       padding: const EdgeInsets.all(16),
-      itemCount: results.length,
+      itemCount: state.results.length,
       itemBuilder: (_, i) {
-        final r = results[i];
-        final opp = MockData.team(r.opponentId);
+        final m = state.results[i];
+        final won = m.myOutcome == 'win';
+        final resultLetter = won ? 'W' : 'L';
+        final resultColor = won ? AppColors.win : AppColors.liveRedLight;
+        final resultBg = won
+            ? AppColors.win.withValues(alpha: 0.14)
+            : AppColors.liveRed.withValues(alpha: 0.14);
+        final matchDate = _formatResultDate(m.startTime);
+
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -598,44 +768,28 @@ class _ResultsTab extends StatelessWidget {
                 width: 26,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: r.resultBg,
+                  color: resultBg,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  r.result,
+                  resultLetter,
                   style: AppTheme.rajdhani(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: r.resultColor,
+                    color: resultColor,
                   ),
                 ),
               ),
               const SizedBox(width: 13),
-              ClipPath(
-                clipper: _MiniHex(),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(gradient: opp.gradient),
-                  alignment: Alignment.center,
-                  child: Text(
-                    opp.mono,
-                    style: AppTheme.rajdhani(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
+              _OppBadge(code: m.oppCode, imageUrl: m.oppImage),
               const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'vs ${opp.name}',
+                      'vs ${m.oppName}',
                       style: AppTheme.rajdhani(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -643,7 +797,7 @@ class _ResultsTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      r.when,
+                      '${m.leagueName} · $matchDate',
                       style: AppTheme.barlow(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -653,7 +807,7 @@ class _ResultsTab extends StatelessWidget {
                 ),
               ),
               Text(
-                r.score,
+                '${m.myWins} - ${m.oppWins}',
                 style: AppTheme.rajdhani(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -664,6 +818,43 @@ class _ResultsTab extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  String _formatResultDate(DateTime dt) {
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[dt.month]} ${dt.day}';
+  }
+}
+
+class _OppBadge extends StatelessWidget {
+  const _OppBadge({required this.code, required this.imageUrl});
+  final String code;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final matchProvider = context.read<MatchProvider>();
+    final team = matchProvider.teamFor(code);
+    return ClipPath(
+      clipper: _MiniHex(),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(gradient: team.gradient),
+        alignment: Alignment.center,
+        child: Text(
+          team.mono,
+          style: AppTheme.rajdhani(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -691,11 +882,26 @@ class _NextMatchTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final team = MockData.team(teamId);
-    final oppId = teamId == 'jdg' ? 'blg' : 'jdg';
-    final opp = MockData.team(oppId);
+    final provider = context.watch<MatchProvider>();
+    final team = provider.teamFor(teamId);
+
+    final next = provider.displayMatches.where(
+      (m) => !m.isCompleted &&
+          (m.team1Id == teamId || m.team2Id == teamId),
+    ).firstOrNull;
+
+    if (next == null) {
+      return _UnavailableTab(
+        icon: Icons.event_outlined,
+        message: 'No upcoming match found for this team.',
+      );
+    }
+
+    final oppId = next.team1Id == teamId ? next.team2Id : next.team1Id;
+    final opp = provider.teamFor(oppId);
 
     return ListView(
+      primary: false,
       padding: const EdgeInsets.all(16),
       children: [
         Container(
@@ -719,7 +925,7 @@ class _NextMatchTab extends StatelessWidget {
           child: Column(
             children: [
               Text(
-                'WORLDS 2025 · GROUP STAGE',
+                '${next.league} · ${next.bo}',
                 style: AppTheme.barlow(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -732,10 +938,7 @@ class _NextMatchTab extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Column(children: [
-                      HexLogo(
-                          size: 56,
-                          gradient: team.gradient,
-                          mono: team.mono),
+                      HexLogo(size: 56, gradient: team.gradient, mono: team.mono),
                       const SizedBox(height: 9),
                       Text(
                         team.name,
@@ -756,10 +959,7 @@ class _NextMatchTab extends StatelessWidget {
                   ),
                   Expanded(
                     child: Column(children: [
-                      HexLogo(
-                          size: 56,
-                          gradient: opp.gradient,
-                          mono: opp.mono),
+                      HexLogo(size: 56, gradient: opp.gradient, mono: opp.mono),
                       const SizedBox(height: 9),
                       Text(
                         opp.name,
@@ -774,7 +974,7 @@ class _NextMatchTab extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Jun 20 · 19:00 KST · Seoul',
+                next.scheduledText ?? '',
                 style: AppTheme.barlow(
                   fontSize: 13,
                   color: AppColors.textSubtle,
@@ -783,59 +983,36 @@ class _NextMatchTab extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            for (final c in [
-              ('02', 'DAYS'),
-              ('14', 'HRS'),
-              ('37', 'MIN'),
-              ('12', 'SEC'),
-            ]) ...[
-              Expanded(child: _CountdownTile(value: c.$1, label: c.$2)),
-              if (c.$2 != 'SEC') const SizedBox(width: 8),
-            ],
-          ],
-        ),
       ],
     );
   }
 }
 
-class _CountdownTile extends StatelessWidget {
-  const _CountdownTile({required this.value, required this.label});
-  final String value;
-  final String label;
+class _UnavailableTab extends StatelessWidget {
+  const _UnavailableTab({required this.icon, required this.message});
+  final IconData icon;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: AppTheme.rajdhani(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.textSubtle, size: 44),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTheme.barlow(
+                fontSize: 13,
+                color: AppColors.textMuted,
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            label,
-            style: AppTheme.barlow(
-              fontSize: 9,
-              letterSpacing: 1.5,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

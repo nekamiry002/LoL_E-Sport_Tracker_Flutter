@@ -2,9 +2,12 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
 import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
+import '../features/matches/presentation/providers/match_provider.dart';
 import '../widgets/hex_clipper.dart';
 import '../widgets/hex_logo.dart';
 import '../widgets/live_pulse_dot.dart';
@@ -20,19 +23,23 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   CardStyle _cardStyle = CardStyle.classic;
-  String _filter = 'ALL';
 
-  List<MatchDisplayData> get _filteredMatches {
-    if (_filter == 'ALL') return MockData.allMatches;
-    return MockData.allMatches.where((m) => m.league == _filter).toList();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MatchProvider>().fetchMatches();
+    });
   }
 
-  void _openTeam(String teamId) {
-    Navigator.pushNamed(context, '/team', arguments: teamId);
+  void _openTeam(String teamCode) {
+    Navigator.pushNamed(context, '/team', arguments: teamCode);
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<MatchProvider>();
+
     return Column(
       children: [
         _Header(
@@ -40,24 +47,131 @@ class _HomeScreenState extends State<HomeScreen> {
           onCardStyleChanged: (s) => setState(() => _cardStyle = s),
         ),
         _FilterChips(
-          selected: _filter,
-          onSelected: (f) => setState(() => _filter = f),
+          selected: provider.leagueFilter,
+          leagues: provider.availableLeagues,
+          onSelected: provider.setFilter,
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 2, 16, 26),
-            itemCount: _filteredMatches.length,
-            itemBuilder: (context, i) {
-              final m = _filteredMatches[i];
-              return _MatchSection(
-                match: m,
+          child: switch (provider.status) {
+            MatchesStatus.initial || MatchesStatus.loading =>
+              const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            MatchesStatus.failure => _ErrorView(
+                message: provider.error ?? 'Unknown error',
+                onRetry: () => provider.fetchMatches(),
+              ),
+            MatchesStatus.success => _MatchList(
+                matches: provider.displayMatches,
                 cardStyle: _cardStyle,
-                onTap: () => _openTeam(m.team1Id),
-              );
-            },
-          ),
+                onTeamTap: _openTeam,
+                provider: provider,
+              ),
+          },
         ),
       ],
+    );
+  }
+}
+
+class _MatchList extends StatelessWidget {
+  const _MatchList({
+    required this.matches,
+    required this.cardStyle,
+    required this.onTeamTap,
+    required this.provider,
+  });
+
+  final List<MatchDisplayData> matches;
+  final CardStyle cardStyle;
+  final ValueChanged<String> onTeamTap;
+  final MatchProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    if (matches.isEmpty) {
+      return Center(
+        child: Text(
+          'No matches found',
+          style: AppTheme.rajdhani(
+            fontSize: 16,
+            color: AppColors.textSubtle,
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 26),
+      itemCount: matches.length,
+      itemBuilder: (context, i) {
+        final m = matches[i];
+        final t1 = provider.teamFor(m.team1Id);
+        final t2 = provider.teamFor(m.team2Id);
+        return _MatchSection(
+          match: m,
+          t1: t1,
+          t2: t2,
+          cardStyle: cardStyle,
+          onTapTeam1: () => onTeamTap(m.team1Id),
+          onTapTeam2: () => onTeamTap(m.team2Id),
+        );
+      },
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, color: AppColors.textSubtle, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load matches',
+              style: AppTheme.rajdhani(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTheme.barlow(fontSize: 12, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: onRetry,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'RETRY',
+                  style: AppTheme.rajdhani(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 2,
+                    color: AppColors.primaryLight,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -193,21 +307,25 @@ class _Bar extends StatelessWidget {
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 
 class _FilterChips extends StatelessWidget {
-  const _FilterChips({required this.selected, required this.onSelected});
+  const _FilterChips({
+    required this.selected,
+    required this.leagues,
+    required this.onSelected,
+  });
 
   final String selected;
+  final List<String> leagues;
   final ValueChanged<String> onSelected;
-
-  static const _filters = ['ALL', 'LCK', 'LPL', 'LEC', 'LCS'];
 
   @override
   Widget build(BuildContext context) {
+    final filters = ['ALL', ...leagues];
     return SizedBox(
       height: 36,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
-        children: _filters.map((f) {
+        children: filters.map((f) {
           final isActive = f == selected;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -252,27 +370,34 @@ class _FilterChips extends StatelessWidget {
 class _MatchSection extends StatelessWidget {
   const _MatchSection({
     required this.match,
+    required this.t1,
+    required this.t2,
     required this.cardStyle,
-    required this.onTap,
+    required this.onTapTeam1,
+    required this.onTapTeam2,
   });
 
   final MatchDisplayData match;
+  final TeamData t1;
+  final TeamData t2;
   final CardStyle cardStyle;
-  final VoidCallback onTap;
+  final VoidCallback onTapTeam1;
+  final VoidCallback onTapTeam2;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (match.isHeadLive) const _SectionHeader(isLive: true),
-        if (match.isHeadUpcoming) const _SectionHeader(isLive: false),
+        if (match.isHeadLive) const _SectionHeader(label: 'LIVE NOW', isLive: true),
+        if (match.isHeadUpcoming) const _SectionHeader(label: 'UPCOMING', isLive: false),
+        if (match.isHeadCompleted) const _SectionHeader(label: 'COMPLETED', isLive: false),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: switch (cardStyle) {
-            CardStyle.classic => ClassicMatchCard(match: match, onTap: onTap),
-            CardStyle.compact => CompactMatchCard(match: match, onTap: onTap),
-            CardStyle.featured => FeaturedMatchCard(match: match, onTap: onTap),
+            CardStyle.classic => ClassicMatchCard(match: match, t1: t1, t2: t2, onTapTeam1: onTapTeam1, onTapTeam2: onTapTeam2),
+            CardStyle.compact => CompactMatchCard(match: match, t1: t1, t2: t2, onTapTeam1: onTapTeam1, onTapTeam2: onTapTeam2),
+            CardStyle.featured => FeaturedMatchCard(match: match, t1: t1, t2: t2, onTapTeam1: onTapTeam1, onTapTeam2: onTapTeam2),
           },
         ),
       ],
@@ -281,7 +406,8 @@ class _MatchSection extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.isLive});
+  const _SectionHeader({required this.label, required this.isLive});
+  final String label;
   final bool isLive;
 
   @override
@@ -295,7 +421,7 @@ class _SectionHeader extends StatelessWidget {
             const SizedBox(width: 9),
           ],
           Text(
-            isLive ? 'LIVE NOW' : 'UPCOMING',
+            label,
             style: AppTheme.rajdhani(
               fontWeight: FontWeight.w700,
               fontSize: 13,
@@ -327,19 +453,24 @@ class _SectionHeader extends StatelessWidget {
 // ─── Classic card ─────────────────────────────────────────────────────────────
 
 class ClassicMatchCard extends StatelessWidget {
-  const ClassicMatchCard({super.key, required this.match, required this.onTap});
+  const ClassicMatchCard({
+    super.key,
+    required this.match,
+    required this.t1,
+    required this.t2,
+    required this.onTapTeam1,
+    required this.onTapTeam2,
+  });
 
   final MatchDisplayData match;
-  final VoidCallback onTap;
+  final TeamData t1;
+  final TeamData t2;
+  final VoidCallback onTapTeam1;
+  final VoidCallback onTapTeam2;
 
   @override
   Widget build(BuildContext context) {
-    final t1 = MockData.team(match.team1Id);
-    final t2 = MockData.team(match.team2Id);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -397,19 +528,22 @@ class ClassicMatchCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Column(children: [
-                          HexLogo(size: 54, gradient: t1.gradient, mono: t1.mono),
-                          const SizedBox(height: 9),
-                          Text(
-                            t1.name,
-                            textAlign: TextAlign.center,
-                            style: AppTheme.rajdhani(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                        child: GestureDetector(
+                          onTap: onTapTeam1,
+                          child: Column(children: [
+                            HexLogo(size: 54, gradient: t1.gradient, mono: t1.mono),
+                            const SizedBox(height: 9),
+                            Text(
+                              t1.name,
+                              textAlign: TextAlign.center,
+                              style: AppTheme.rajdhani(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                          ),
-                        ]),
+                          ]),
+                        ),
                       ),
                       SizedBox(
                         width: 78,
@@ -434,19 +568,22 @@ class ClassicMatchCard extends StatelessWidget {
                         ]),
                       ),
                       Expanded(
-                        child: Column(children: [
-                          HexLogo(size: 54, gradient: t2.gradient, mono: t2.mono),
-                          const SizedBox(height: 9),
-                          Text(
-                            t2.name,
-                            textAlign: TextAlign.center,
-                            style: AppTheme.rajdhani(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                        child: GestureDetector(
+                          onTap: onTapTeam2,
+                          child: Column(children: [
+                            HexLogo(size: 54, gradient: t2.gradient, mono: t2.mono),
+                            const SizedBox(height: 9),
+                            Text(
+                              t2.name,
+                              textAlign: TextAlign.center,
+                              style: AppTheme.rajdhani(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                          ),
-                        ]),
+                          ]),
+                        ),
                       ),
                     ],
                   ),
@@ -455,7 +592,6 @@ class ClassicMatchCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -463,34 +599,41 @@ class ClassicMatchCard extends StatelessWidget {
 // ─── Compact card ─────────────────────────────────────────────────────────────
 
 class CompactMatchCard extends StatelessWidget {
-  const CompactMatchCard({super.key, required this.match, required this.onTap});
+  const CompactMatchCard({
+    super.key,
+    required this.match,
+    required this.t1,
+    required this.t2,
+    required this.onTapTeam1,
+    required this.onTapTeam2,
+  });
 
   final MatchDisplayData match;
-  final VoidCallback onTap;
+  final TeamData t1;
+  final TeamData t2;
+  final VoidCallback onTapTeam1;
+  final VoidCallback onTapTeam2;
 
   @override
   Widget build(BuildContext context) {
-    final t1 = MockData.team(match.team1Id);
-    final t2 = MockData.team(match.team2Id);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            left: BorderSide(
-                color: AppColors.leagueColor(match.league), width: 3),
-            top: BorderSide(color: AppColors.border),
-            right: BorderSide(color: AppColors.border),
-            bottom: BorderSide(color: AppColors.border),
-          ),
-          borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          left: BorderSide(
+              color: AppColors.leagueColor(match.league), width: 3),
+          top: BorderSide(color: AppColors.border),
+          right: BorderSide(color: AppColors.border),
+          bottom: BorderSide(color: AppColors.border),
         ),
-        child: Row(
-          children: [
-            Expanded(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: onTapTeam1,
               child: Row(children: [
                 SmallHexLogo(gradient: t1.gradient, mono: t1.mono),
                 const SizedBox(width: 9),
@@ -506,29 +649,32 @@ class CompactMatchCard extends StatelessWidget {
                 ),
               ]),
             ),
-            const SizedBox(width: 8),
-            Column(children: [
-              Text(
-                match.centerText,
-                style: AppTheme.rajdhani(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: match.centerColor,
-                ),
+          ),
+          const SizedBox(width: 8),
+          Column(children: [
+            Text(
+              match.centerText,
+              style: AppTheme.rajdhani(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: match.centerColor,
               ),
-              Text(
-                match.statusText,
-                style: AppTheme.barlow(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                  color: match.statusColor,
-                ),
+            ),
+            Text(
+              match.statusText,
+              style: AppTheme.barlow(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+                color: match.statusColor,
               ),
-            ]),
-            const SizedBox(width: 8),
-            Expanded(
+            ),
+          ]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: onTapTeam2,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -548,8 +694,8 @@ class CompactMatchCard extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -558,20 +704,24 @@ class CompactMatchCard extends StatelessWidget {
 // ─── Featured card ────────────────────────────────────────────────────────────
 
 class FeaturedMatchCard extends StatelessWidget {
-  const FeaturedMatchCard(
-      {super.key, required this.match, required this.onTap});
+  const FeaturedMatchCard({
+    super.key,
+    required this.match,
+    required this.t1,
+    required this.t2,
+    required this.onTapTeam1,
+    required this.onTapTeam2,
+  });
 
   final MatchDisplayData match;
-  final VoidCallback onTap;
+  final TeamData t1;
+  final TeamData t2;
+  final VoidCallback onTapTeam1;
+  final VoidCallback onTapTeam2;
 
   @override
   Widget build(BuildContext context) {
-    final t1 = MockData.team(match.team1Id);
-    final t2 = MockData.team(match.team2Id);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment(-0.6, -1),
@@ -633,17 +783,20 @@ class FeaturedMatchCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Column(children: [
-                          HexLogo(size: 60, gradient: t1.gradient, mono: t1.mono),
-                          const SizedBox(height: 10),
-                          Text(
-                            t1.name,
-                            style: AppTheme.rajdhani(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        child: GestureDetector(
+                          onTap: onTapTeam1,
+                          child: Column(children: [
+                            HexLogo(size: 60, gradient: t1.gradient, mono: t1.mono),
+                            const SizedBox(height: 10),
+                            Text(
+                              t1.name,
+                              style: AppTheme.rajdhani(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ]),
+                          ]),
+                        ),
                       ),
                       SizedBox(
                         width: 84,
@@ -669,17 +822,20 @@ class FeaturedMatchCard extends StatelessWidget {
                         ]),
                       ),
                       Expanded(
-                        child: Column(children: [
-                          HexLogo(size: 60, gradient: t2.gradient, mono: t2.mono),
-                          const SizedBox(height: 10),
-                          Text(
-                            t2.name,
-                            style: AppTheme.rajdhani(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        child: GestureDetector(
+                          onTap: onTapTeam2,
+                          child: Column(children: [
+                            HexLogo(size: 60, gradient: t2.gradient, mono: t2.mono),
+                            const SizedBox(height: 10),
+                            Text(
+                              t2.name,
+                              style: AppTheme.rajdhani(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ]),
+                          ]),
+                        ),
                       ),
                     ],
                   ),
@@ -724,7 +880,6 @@ class FeaturedMatchCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

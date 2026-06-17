@@ -9,6 +9,7 @@ class TeamData {
     required this.region,
     required this.color1,
     required this.color2,
+    this.apiId = '',
   });
 
   final String id;
@@ -17,6 +18,7 @@ class TeamData {
   final String region;
   final Color color1;
   final Color color2;
+  final String apiId;
 
   Gradient get gradient => RadialGradient(
         center: const Alignment(-0.36, -0.48),
@@ -122,6 +124,7 @@ class MatchDisplayData {
     required this.league,
     required this.bo,
     required this.isLive,
+    this.isCompleted = false,
     this.team1Wins = 0,
     this.team2Wins = 0,
     this.game,
@@ -129,6 +132,7 @@ class MatchDisplayData {
     this.scheduledText,
     this.isHeadLive = false,
     this.isHeadUpcoming = false,
+    this.isHeadCompleted = false,
   });
 
   final String id;
@@ -137,6 +141,7 @@ class MatchDisplayData {
   final String league;
   final String bo;
   final bool isLive;
+  final bool isCompleted;
   final int team1Wins;
   final int team2Wins;
   final String? game;
@@ -144,14 +149,24 @@ class MatchDisplayData {
   final String? scheduledText;
   final bool isHeadLive;
   final bool isHeadUpcoming;
+  final bool isHeadCompleted;
 
-  String get centerText => isLive ? '$team1Wins - $team2Wins' : 'VS';
-  Color get centerColor => isLive ? AppColors.primary : AppColors.textMuted;
+  String get centerText =>
+      (isLive || isCompleted) ? '$team1Wins - $team2Wins' : 'VS';
+  Color get centerColor =>
+      isLive ? AppColors.primary : AppColors.textMuted;
   String get subText =>
       isLive ? (game ?? '') : 'Best of ${bo.substring(2)}';
-  String get statusText => isLive ? 'LIVE' : (scheduledText ?? '');
-  Color get statusColor =>
-      isLive ? AppColors.liveRedLight : AppColors.textSecondary;
+  String get statusText => isLive
+      ? 'LIVE'
+      : isCompleted
+          ? 'FINAL'
+          : (scheduledText ?? '');
+  Color get statusColor => isLive
+      ? AppColors.liveRedLight
+      : isCompleted
+          ? AppColors.textMuted
+          : AppColors.textSecondary;
   Color get statusBg => isLive
       ? AppColors.liveRed.withValues(alpha: 0.16)
       : Colors.white.withValues(alpha: 0.05);

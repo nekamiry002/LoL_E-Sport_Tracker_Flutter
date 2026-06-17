@@ -1,5 +1,8 @@
 const String kLolesportsBaseUrl = 'https://lolesports.com/api/gql';
 
+const String kEsportsApiBaseUrl = 'https://esports-api.lolesports.com/persisted/gw';
+const String kEsportsApiKey = '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
+
 const String kGqlHash =
     '7246add6f577cf30b304e651bf9e25fc6a41fe49aeafb0754c16b5778060fc0a';
 
