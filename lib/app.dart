@@ -6,6 +6,8 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/matches/matches_setup.dart';
 import 'providers/app_provider.dart';
+import 'providers/language_provider.dart';
+import 'providers/notification_prefs_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/history_screen.dart';
@@ -20,10 +22,14 @@ class App extends StatelessWidget {
     super.key,
     required this.appProvider,
     required this.authProvider,
+    required this.notificationPrefs,
+    required this.languageProvider,
   });
 
   final AppProvider appProvider;
   final AuthProvider authProvider;
+  final NotificationPrefsProvider notificationPrefs;
+  final LanguageProvider languageProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +37,8 @@ class App extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: authProvider),
         ChangeNotifierProvider.value(value: appProvider),
+        ChangeNotifierProvider.value(value: notificationPrefs),
+        ChangeNotifierProvider.value(value: languageProvider),
       ],
       child: matchProviders(
         child: MaterialApp(

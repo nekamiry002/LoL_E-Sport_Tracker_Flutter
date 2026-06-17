@@ -13,11 +13,13 @@ class AuthRepositoryMemory implements AuthRepository {
 
   @override
   Future<UserData> login(String email, String password) async {
-    final hashed = PasswordHasher.hash(password, email: email);
-    final record = _users
-        .where((u) => u.email == email && u.passwordHash == hashed)
-        .firstOrNull;
+    final record = _users.where((u) => u.email == email).firstOrNull;
     if (record == null) throw Exception('Email ou mot de passe incorrect.');
+    final newHash = PasswordHasher.hash(password, userId: record.id);
+    final legacyHash = PasswordHasher.hashLegacy(password, email: email);
+    if (record.passwordHash != newHash && record.passwordHash != legacyHash) {
+      throw Exception('Email ou mot de passe incorrect.');
+    }
     _currentUser = record.toUserData();
     return _currentUser!;
   }
@@ -28,15 +30,34 @@ class AuthRepositoryMemory implements AuthRepository {
     if (_users.any((u) => u.email == email)) {
       throw Exception('Cet email est déjà utilisé.');
     }
+    final id = _nextId++;
     final record = _UserRecord(
-      id: _nextId++,
+      id: id,
       username: username,
       email: email,
-      passwordHash: PasswordHasher.hash(password, email: email),
+      passwordHash: PasswordHasher.hash(password, userId: id),
       createdAt: DateTime.now(),
     );
     _users.add(record);
     _currentUser = record.toUserData();
+    return _currentUser!;
+  }
+
+  @override
+  Future<UserData> updateUser({String? username, String? email}) async {
+    if (_currentUser == null) throw Exception('Not logged in.');
+    final idx = _users.indexWhere((u) => u.id == _currentUser!.id);
+    if (idx == -1) throw Exception('User not found.');
+    final old = _users[idx];
+    final updated = _UserRecord(
+      id: old.id,
+      username: username ?? old.username,
+      email: email ?? old.email,
+      passwordHash: old.passwordHash,
+      createdAt: old.createdAt,
+    );
+    _users[idx] = updated;
+    _currentUser = updated.toUserData();
     return _currentUser!;
   }
 

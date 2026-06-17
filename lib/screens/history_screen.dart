@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../features/matches/data/datasources/league_schedule_datasource.dart';
+import '../features/matches/presentation/providers/history_provider.dart';
+import '../features/matches/presentation/providers/match_provider.dart';
 import '../widgets/hex_logo.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -14,32 +17,73 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   String _filter = 'ALL';
 
-  static const _leagues = ['ALL', 'LCK', 'LPL', 'LEC', 'LCS', 'Worlds'];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<HistoryProvider>();
+      if (provider.status == HistoryStatus.initial) {
+        provider.fetchHistory();
+      }
+    });
+  }
 
-  List<HistoryMatchData> get _filtered => _filter == 'ALL'
-      ? MockData.historyMatches
-      : MockData.historyMatches.where((m) => m.league == _filter).toList();
+  List<HistoryMatch> _filtered(List<HistoryMatch> all) {
+    if (_filter == 'ALL') return all;
+    return all.where((m) => m.leagueName == _filter).toList();
+  }
 
-  List<String> get _dateGroups {
+  List<String> _dateGroups(List<HistoryMatch> matches) {
     final seen = <String>{};
-    return _filtered.map((m) => m.dateLabel).where(seen.add).toList();
+    return matches.map((m) => m.dateLabel).where(seen.add).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
+    final provider = context.watch<HistoryProvider>();
+    final filtered = _filtered(provider.matches);
+    final leagues = ['ALL', ...provider.availableLeagues];
+
     return Column(
       children: [
         _Header(count: filtered.length),
         _LeagueFilter(
-          leagues: _leagues,
+          leagues: leagues,
           selected: _filter,
           onSelect: (l) => setState(() => _filter = l),
         ),
         Expanded(
-          child: filtered.isEmpty
-              ? const _EmptyState()
-              : _MatchList(groups: _dateGroups, matches: filtered),
+          child: switch (provider.status) {
+            HistoryStatus.initial || HistoryStatus.loading =>
+              const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            HistoryStatus.failure =>
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.textMuted, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Failed to load history',
+                      style: AppTheme.rajdhani(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => provider.fetchHistory(),
+                      child: Text('Retry', style: AppTheme.rajdhani(color: AppColors.primary)),
+                    ),
+                  ],
+                ),
+              ),
+            HistoryStatus.success when filtered.isEmpty =>
+              const _EmptyState(),
+            HistoryStatus.success =>
+              _MatchList(groups: _dateGroups(filtered), matches: filtered),
+          },
         ),
       ],
     );
@@ -164,6 +208,7 @@ class _LeagueFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (leagues.length <= 1) return const SizedBox(height: 40);
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -180,8 +225,7 @@ class _LeagueFilter extends StatelessWidget {
             onTap: () => onSelect(l),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
                 color: active
                     ? color.withValues(alpha: 0.18)
@@ -197,8 +241,7 @@ class _LeagueFilter extends StatelessWidget {
                 l,
                 style: AppTheme.rajdhani(
                   fontSize: 12,
-                  fontWeight:
-                      active ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                   letterSpacing: 1.5,
                   color: active ? color : AppColors.textSecondary,
                 ),
@@ -216,7 +259,7 @@ class _LeagueFilter extends StatelessWidget {
 class _MatchList extends StatelessWidget {
   const _MatchList({required this.groups, required this.matches});
   final List<String> groups;
-  final List<HistoryMatchData> matches;
+  final List<HistoryMatch> matches;
 
   @override
   Widget build(BuildContext context) {
@@ -225,8 +268,7 @@ class _MatchList extends StatelessWidget {
       itemCount: groups.length,
       itemBuilder: (_, i) {
         final group = groups[i];
-        final groupMatches =
-            matches.where((m) => m.dateLabel == group).toList();
+        final groupMatches = matches.where((m) => m.dateLabel == group).toList();
         return _DateSection(dateLabel: group, matches: groupMatches);
       },
     );
@@ -236,7 +278,7 @@ class _MatchList extends StatelessWidget {
 class _DateSection extends StatelessWidget {
   const _DateSection({required this.dateLabel, required this.matches});
   final String dateLabel;
-  final List<HistoryMatchData> matches;
+  final List<HistoryMatch> matches;
 
   @override
   Widget build(BuildContext context) {
@@ -283,17 +325,17 @@ class _DateSection extends StatelessWidget {
 
 class _ResultCard extends StatelessWidget {
   const _ResultCard({required this.match});
-  final HistoryMatchData match;
+  final HistoryMatch match;
 
   @override
   Widget build(BuildContext context) {
-    final team1 = MockData.team(match.team1Id);
-    final team2 = MockData.team(match.team2Id);
-    final leagueColor = AppColors.leagueColor(match.league);
+    final leagueColor = AppColors.leagueColor(match.leagueName);
+    final matchProvider = context.read<MatchProvider>();
+    final team1 = matchProvider.teamFor(match.team1Code);
+    final team2 = matchProvider.teamFor(match.team2Code);
 
     return GestureDetector(
-      onTap: () =>
-          Navigator.pushNamed(context, '/team', arguments: team1.id),
+      onTap: () => Navigator.pushNamed(context, '/team', arguments: match.team1Code),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -311,10 +353,7 @@ class _ResultCard extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 2,
+              top: 0, left: 0, right: 0, height: 2,
               child: ColoredBox(color: leagueColor.withValues(alpha: 0.7)),
             ),
             Padding(
@@ -324,14 +363,13 @@ class _ResultCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: leagueColor.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          match.league,
+                          match.leagueName,
                           style: AppTheme.rajdhani(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -342,11 +380,8 @@ class _ResultCard extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        match.bo,
-                        style: AppTheme.barlow(
-                          fontSize: 11,
-                          color: AppColors.textMuted,
-                        ),
+                        'BO${match.bestOf}',
+                        style: AppTheme.barlow(fontSize: 11, color: AppColors.textMuted),
                       ),
                     ],
                   ),
@@ -356,14 +391,11 @@ class _ResultCard extends StatelessWidget {
                       Expanded(
                         child: Row(
                           children: [
-                            HexLogo(
-                                size: 40,
-                                gradient: team1.gradient,
-                                mono: team1.mono),
+                            HexLogo(size: 40, gradient: team1.gradient, mono: team1.mono),
                             const SizedBox(width: 10),
                             Flexible(
                               child: Text(
-                                team1.name,
+                                match.team1Name.isNotEmpty ? match.team1Name : team1.name,
                                 overflow: TextOverflow.ellipsis,
                                 style: AppTheme.rajdhani(
                                   fontSize: 15,
@@ -380,19 +412,13 @@ class _ResultCard extends StatelessWidget {
                         ),
                       ),
                       Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                           decoration: BoxDecoration(
-                            color:
-                                AppColors.primary.withValues(alpha: 0.10),
+                            color: AppColors.primary.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: AppColors.primary
-                                  .withValues(alpha: 0.25),
-                            ),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
                           ),
                           child: Text(
                             match.scoreText,
@@ -411,7 +437,7 @@ class _ResultCard extends StatelessWidget {
                           children: [
                             Flexible(
                               child: Text(
-                                team2.name,
+                                match.team2Name.isNotEmpty ? match.team2Name : team2.name,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.end,
                                 style: AppTheme.rajdhani(
@@ -426,10 +452,7 @@ class _ResultCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            HexLogo(
-                                size: 40,
-                                gradient: team2.gradient,
-                                mono: team2.mono),
+                            HexLogo(size: 40, gradient: team2.gradient, mono: team2.mono),
                           ],
                         ),
                       ),
@@ -456,11 +479,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.history,
-            size: 56,
-            color: AppColors.textMuted.withValues(alpha: 0.5),
-          ),
+          Icon(Icons.history, size: 56, color: AppColors.textMuted.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
             'NO RESULTS',
@@ -474,10 +493,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'No matches found for this filter.',
-            style: AppTheme.barlow(
-              fontSize: 14,
-              color: AppColors.textMuted,
-            ),
+            style: AppTheme.barlow(fontSize: 14, color: AppColors.textMuted),
           ),
         ],
       ),

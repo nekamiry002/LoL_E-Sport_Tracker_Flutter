@@ -4,6 +4,8 @@ import 'package:lol_esport_tracker/features/auth/data/repositories/auth_reposito
 import 'package:lol_esport_tracker/features/auth/providers/auth_provider.dart';
 import 'package:lol_esport_tracker/features/favorites/data/repositories/favorites_repository_memory.dart';
 import 'package:lol_esport_tracker/providers/app_provider.dart';
+import 'package:lol_esport_tracker/providers/language_provider.dart';
+import 'package:lol_esport_tracker/providers/notification_prefs_provider.dart';
 
 void main() {
   testWidgets(
@@ -16,7 +18,7 @@ void main() {
     await appProvider.init();
 
     await tester.pumpWidget(
-        App(appProvider: appProvider, authProvider: authProvider));
+        App(appProvider: appProvider, authProvider: authProvider, notificationPrefs: NotificationPrefsProvider(), languageProvider: LanguageProvider()));
     await tester.pump();
 
     // Not authenticated → login screen should show
@@ -34,7 +36,7 @@ void main() {
     await appProvider.init();
 
     await tester.pumpWidget(
-        App(appProvider: appProvider, authProvider: authProvider));
+        App(appProvider: appProvider, authProvider: authProvider, notificationPrefs: NotificationPrefsProvider(), languageProvider: LanguageProvider()));
     await tester.pump();
 
     // Authenticated → main shell should show MATCHES

@@ -19,9 +19,20 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserData> login(String email, String password) async {
-    final hashed = PasswordHasher.hash(password, email: email);
-    final row = await _datasource.findByEmailAndPassword(email, hashed);
+    // Find user by email only first to get the ID for hashing.
+    final row = await _datasource.findByEmail(email);
     if (row == null) throw Exception('Email ou mot de passe incorrect.');
+    final id = row['id'] as int;
+    final newHash = PasswordHasher.hash(password, userId: id);
+    final legacyHash = PasswordHasher.hashLegacy(password, email: email);
+    final stored = row['password'] as String;
+    if (stored != newHash && stored != legacyHash) {
+      throw Exception('Email ou mot de passe incorrect.');
+    }
+    // Migrate legacy hash transparently.
+    if (stored == legacyHash) {
+      await _datasource.updatePassword(id, newHash);
+    }
     final user = _fromRow(row);
     await _datasource.saveSession(user.id);
     return user;
@@ -33,16 +44,27 @@ class AuthRepositoryImpl implements AuthRepository {
     if (await _datasource.emailExists(email)) {
       throw Exception('Cet email est déjà utilisé.');
     }
-    final hashed = PasswordHasher.hash(password, email: email);
     final now = DateTime.now();
+    // Create with a placeholder hash, then update with ID-based hash.
     final id = await _datasource.createUser(
       username: username,
       email: email,
-      hashedPassword: hashed,
+      hashedPassword: '',
       createdAt: now.millisecondsSinceEpoch,
     );
+    final hashed = PasswordHasher.hash(password, userId: id);
+    await _datasource.updatePassword(id, hashed);
     await _datasource.saveSession(id);
     return UserData(id: id, username: username, email: email, createdAt: now);
+  }
+
+  @override
+  Future<UserData> updateUser({String? username, String? email}) async {
+    final id = await _datasource.getCurrentUserId();
+    if (id == null) throw Exception('Not logged in.');
+    await _datasource.updateUser(id, username: username, email: email);
+    final row = await _datasource.getUserById(id);
+    return _fromRow(row!);
   }
 
   @override

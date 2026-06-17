@@ -10,6 +10,7 @@ import 'domain/usecases/get_matches.dart';
 import 'presentation/providers/match_provider.dart';
 import 'presentation/providers/roster_provider.dart';
 import 'presentation/providers/team_schedule_provider.dart';
+import 'presentation/providers/history_provider.dart';
 
 /// Wraps [child] with all match-feature providers.
 Widget matchProviders({required Widget child}) {
@@ -22,9 +23,10 @@ Widget matchProviders({required Widget child}) {
 
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => MatchProvider(getMatches)),
+      ChangeNotifierProvider(create: (_) => MatchProvider(getMatches, scheduleDatasource: scheduleDatasource)),
       ChangeNotifierProvider(create: (_) => RosterProvider(teamDatasource)),
       ChangeNotifierProvider(create: (_) => TeamScheduleProvider(scheduleDatasource)),
+      ChangeNotifierProvider(create: (_) => HistoryProvider(scheduleDatasource)),
     ],
     child: child,
   );

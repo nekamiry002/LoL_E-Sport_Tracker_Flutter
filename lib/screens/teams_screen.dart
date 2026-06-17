@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
+import '../features/matches/presentation/providers/match_provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/hex_logo.dart';
 
@@ -18,31 +19,53 @@ class _TeamsScreenState extends State<TeamsScreen> {
 
   static const _regions = ['ALL', 'LCK', 'LPL', 'LEC', 'LCS'];
 
-  List<TeamData> get _filtered {
-    final all = MockData.teams.values.toList();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<MatchProvider>();
+      if (provider.teamRegistry.isEmpty) provider.fetchMatches();
+    });
+  }
+
+  List<TeamData> _filtered(Map<String, TeamData> registry) {
+    final all = registry.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
     if (_region == 'ALL') return all;
     return all.where((t) => t.region == _region).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final teams = _filtered;
+    final matchProvider = context.watch<MatchProvider>();
+    final registry = matchProvider.teamRegistry;
+    final teams = _filtered(registry);
     return Column(
       children: [
-        _Header(total: MockData.teams.length),
+        _Header(total: registry.length),
         _RegionFilter(
           regions: _regions,
           selected: _region,
           onSelect: (r) => setState(() => _region = r),
         ),
-        Expanded(
+        if (registry.isEmpty && matchProvider.status == MatchesStatus.loading)
+          const Expanded(
+            child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          )
+        else if (teams.isEmpty)
+          const Expanded(
+            child: Center(
+              child: Text('No teams found.', style: TextStyle(color: AppColors.textMuted)),
+            ),
+          )
+        else Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.78,
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.55,
             ),
             itemCount: teams.length,
             itemBuilder: (_, i) => _TeamCard(team: teams[i]),
@@ -227,123 +250,162 @@ class _TeamCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFav = context.watch<AppProvider>().isFavorite(team.id);
     final regionColor = AppColors.leagueColor(team.region);
+    final matches = context.read<MatchProvider>().displayMatches;
+
+    // Find next/live match for this team
+    final liveMatch = matches.where((m) =>
+      m.isLive && (m.team1Id == team.id || m.team2Id == team.id)
+    ).firstOrNull;
+    final nextMatch = matches.where((m) =>
+      !m.isCompleted && !m.isLive &&
+      (m.team1Id == team.id || m.team2Id == team.id)
+    ).firstOrNull;
+
+    String? opponentCode;
+    String? matchInfo;
+    bool isLive = false;
+
+    if (liveMatch != null) {
+      isLive = true;
+      opponentCode = liveMatch.team1Id == team.id ? liveMatch.team2Id : liveMatch.team1Id;
+      matchInfo = 'LIVE NOW';
+    } else if (nextMatch != null) {
+      opponentCode = nextMatch.team1Id == team.id ? nextMatch.team2Id : nextMatch.team1Id;
+      matchInfo = nextMatch.scheduledText ?? '';
+    }
 
     return GestureDetector(
-      onTap: () =>
-          Navigator.pushNamed(context, '/team', arguments: team.id),
+      onTap: () => Navigator.pushNamed(context, '/team', arguments: team.id),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          border: Border.all(
+            color: isLive
+                ? AppColors.liveRed.withValues(alpha: 0.5)
+                : AppColors.border,
+          ),
+          borderRadius: BorderRadius.circular(14),
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
           children: [
+            // Color glow top-right
             Positioned(
-              top: -20,
-              right: -20,
+              top: -16,
+              right: -16,
               child: Container(
-                width: 80,
-                height: 80,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [
-                      team.color1.withValues(alpha: 0.18),
-                      Colors.transparent,
-                    ],
+                    colors: [team.color1.withValues(alpha: 0.2), Colors.transparent],
                   ),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+              padding: const EdgeInsets.all(10),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: GestureDetector(
-                      onTap: () =>
-                          context.read<AppProvider>().toggleFavorite(team.id),
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          isFav ? Icons.star : Icons.star_outline,
-                          size: 20,
-                          color: isFav
-                              ? AppColors.primary
-                              : AppColors.textMuted,
+                  // Top row: region badge + star
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: regionColor.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: regionColor.withValues(alpha: 0.35)),
+                        ),
+                        child: Text(
+                          team.region,
+                          style: AppTheme.rajdhani(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: regionColor,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  HexLogo(
-                      size: 68, gradient: team.gradient, mono: team.mono),
-                  const SizedBox(height: 12),
-                  Text(
-                    team.name,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.rajdhani(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: regionColor.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: regionColor.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Text(
-                      team.region,
-                      style: AppTheme.rajdhani(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.5,
-                        color: regionColor,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 11,
-                        color: AppColors.textMuted,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          team.nextMatch,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: AppTheme.barlow(
-                            fontSize: 11,
-                            color: AppColors.textMuted,
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => context.read<AppProvider>().toggleFavorite(team.id),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Icon(
+                            isFav ? Icons.star : Icons.star_outline,
+                            size: 15,
+                            color: isFav ? AppColors.primary : AppColors.textMuted,
                           ),
                         ),
                       ),
                     ],
                   ),
+                  // Middle: logo + name
+                  Row(
+                    children: [
+                      HexLogo(size: 32, gradient: team.gradient, mono: team.mono),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          team.name,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          style: AppTheme.rajdhani(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Bottom: match info
+                  if (matchInfo != null)
+                    Row(
+                      children: [
+                        if (isLive) ...[
+                          Container(
+                            width: 6, height: 6,
+                            decoration: const BoxDecoration(
+                              color: AppColors.liveRedLight,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text('LIVE', style: AppTheme.rajdhani(
+                            fontSize: 9, fontWeight: FontWeight.w700,
+                            letterSpacing: 1, color: AppColors.liveRedLight,
+                          )),
+                        ] else ...[
+                          const Icon(Icons.access_time, size: 9, color: AppColors.textMuted),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(matchInfo,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTheme.barlow(fontSize: 9, color: AppColors.textMuted),
+                            ),
+                          ),
+                        ],
+                        if (opponentCode != null) ...[
+                          const Spacer(),
+                          Text('vs $opponentCode',
+                            style: AppTheme.rajdhani(
+                              fontSize: 9, fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    )
+                  else
+                    Text('No upcoming match',
+                      style: AppTheme.barlow(fontSize: 9, color: AppColors.textSubtle),
+                    ),
                 ],
               ),
             ),

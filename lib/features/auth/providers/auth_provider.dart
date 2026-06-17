@@ -44,6 +44,19 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> updateUser({String? username, String? email}) async {
+    _error = null;
+    try {
+      _user = await _repository.updateUser(username: username, email: email);
+      notifyListeners();
+      return true;
+    } on Exception catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _repository.logout();
     _user = null;

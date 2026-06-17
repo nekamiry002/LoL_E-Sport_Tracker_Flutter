@@ -76,25 +76,29 @@ List<MatchDisplayData> adaptMatches(
   bool completedHeaderDone = false;
 
   return sorted.map((m) {
-    // Register teams
-    teamRegistry.putIfAbsent(
-      m.team1Code,
-      () => teamDataFromApi(
-        code: m.team1Code,
-        name: m.team1Name,
-        leagueSlug: m.leagueSlug,
-        apiId: m.team1ApiId,
-      ),
-    );
-    teamRegistry.putIfAbsent(
-      m.team2Code,
-      () => teamDataFromApi(
-        code: m.team2Code,
-        name: m.team2Name,
-        leagueSlug: m.leagueSlug,
-        apiId: m.team2ApiId,
-      ),
-    );
+    // Register teams (skip placeholder TBD entries)
+    if (m.team1Code.isNotEmpty && m.team1Code != 'TBD') {
+      teamRegistry.putIfAbsent(
+        m.team1Code,
+        () => teamDataFromApi(
+          code: m.team1Code,
+          name: m.team1Name,
+          leagueSlug: m.leagueSlug,
+          apiId: m.team1ApiId,
+        ),
+      );
+    }
+    if (m.team2Code.isNotEmpty && m.team2Code != 'TBD') {
+      teamRegistry.putIfAbsent(
+        m.team2Code,
+        () => teamDataFromApi(
+          code: m.team2Code,
+          name: m.team2Name,
+          leagueSlug: m.leagueSlug,
+          apiId: m.team2ApiId,
+        ),
+      );
+    }
 
     final isLive = m.state == MatchState.inProgress;
     final isUpcoming = m.state == MatchState.unstarted;

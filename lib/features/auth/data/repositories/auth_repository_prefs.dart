@@ -4,12 +4,10 @@ import '../../domain/entities/user_data.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../../../core/utils/password_hasher.dart';
 
-/// Web implementation: persists users and session in browser localStorage.
+/// Web / macOS implementation: persists users and session in SharedPreferences.
 class AuthRepositoryPrefs implements AuthRepository {
   static const _usersKey = 'auth_users';
   static const _sessionKey = 'auth_session_user_id';
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -32,8 +30,6 @@ class AuthRepositoryPrefs implements AuthRepository {
         createdAt: DateTime.fromMillisecondsSinceEpoch(m['created_at'] as int),
       );
 
-  // ── AuthRepository ─────────────────────────────────────────────────────────
-
   @override
   Future<UserData?> getCurrentUser() async {
     final prefs = await _prefs;
@@ -47,15 +43,30 @@ class AuthRepositoryPrefs implements AuthRepository {
   @override
   Future<UserData> login(String email, String password) async {
     final users = await _loadUsers();
-    final hashed = PasswordHasher.hash(password, email: email);
-    final match = users
-        .where((u) => u['email'] == email && u['password'] == hashed)
-        .firstOrNull;
-    if (match == null) throw Exception('Email ou mot de passe incorrect.');
-    final user = _fromMap(match);
+    final byEmail = users.where((u) => u['email'] == email).firstOrNull;
+    if (byEmail == null) throw Exception('Email ou mot de passe incorrect.');
+
+    final id = byEmail['id'] as int;
+
+    // Try new hash (by userId) first, then legacy (by email) for old accounts.
+    final newHash = PasswordHasher.hash(password, userId: id);
+    final legacyHash = PasswordHasher.hashLegacy(password, email: email);
+    final stored = byEmail['password'] as String;
+
+    if (stored != newHash && stored != legacyHash) {
+      throw Exception('Email ou mot de passe incorrect.');
+    }
+
+    // Migrate legacy hash to new format on successful login.
+    if (stored == legacyHash) {
+      final idx = users.indexOf(byEmail);
+      users[idx] = {...byEmail, 'password': newHash};
+      await _saveUsers(users);
+    }
+
     final prefs = await _prefs;
-    await prefs.setInt(_sessionKey, user.id);
-    return user;
+    await prefs.setInt(_sessionKey, id);
+    return _fromMap(byEmail);
   }
 
   @override
@@ -71,7 +82,7 @@ class AuthRepositoryPrefs implements AuthRepository {
       'id': id,
       'username': username,
       'email': email,
-      'password': PasswordHasher.hash(password, email: email),
+      'password': PasswordHasher.hash(password, userId: id),
       'created_at': now.millisecondsSinceEpoch,
     };
     users.add(newUser);
@@ -79,6 +90,26 @@ class AuthRepositoryPrefs implements AuthRepository {
     final prefs = await _prefs;
     await prefs.setInt(_sessionKey, id);
     return UserData(id: id, username: username, email: email, createdAt: now);
+  }
+
+  @override
+  Future<UserData> updateUser({String? username, String? email}) async {
+    final prefs = await _prefs;
+    final userId = prefs.getInt(_sessionKey);
+    if (userId == null) throw Exception('Not logged in.');
+    final users = await _loadUsers();
+    final idx = users.indexWhere((u) => u['id'] == userId);
+    if (idx == -1) throw Exception('User not found.');
+    final old = users[idx];
+    users[idx] = {
+      ...old,
+      ...{
+        'username': username,
+        'email': email,
+      }..removeWhere((_, v) => v == null),
+    };
+    await _saveUsers(users);
+    return _fromMap(users[idx]);
   }
 
   @override
