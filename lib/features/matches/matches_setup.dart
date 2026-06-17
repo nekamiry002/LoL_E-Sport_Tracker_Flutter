@@ -23,7 +23,7 @@ Widget matchProviders({required Widget child}) {
 
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => MatchProvider(getMatches, scheduleDatasource: scheduleDatasource)),
+      ChangeNotifierProvider(create: (_) => MatchProvider(getMatches, scheduleDatasource: scheduleDatasource, matchDatasource: matchDatasource)),
       ChangeNotifierProvider(create: (_) => RosterProvider(teamDatasource)),
       ChangeNotifierProvider(create: (_) => TeamScheduleProvider(scheduleDatasource)),
       ChangeNotifierProvider(create: (_) => HistoryProvider(scheduleDatasource)),

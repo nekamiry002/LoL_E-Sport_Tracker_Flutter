@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show Color;
 import '../../../../core/constants/api_constants.dart';
 import '../../../../data/mock_data.dart';
 import '../../data/datasources/league_schedule_datasource.dart';
+import '../../data/datasources/match_remote_datasource.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/usecases/get_matches.dart';
 import '../adapters/match_adapter.dart';
@@ -11,11 +12,16 @@ import '../adapters/match_adapter.dart';
 enum MatchesStatus { initial, loading, success, failure }
 
 class MatchProvider extends ChangeNotifier {
-  MatchProvider(this._getMatches, {LeagueScheduleDatasource? scheduleDatasource})
-      : _scheduleDatasource = scheduleDatasource;
+  MatchProvider(
+    this._getMatches, {
+    LeagueScheduleDatasource? scheduleDatasource,
+    MatchRemoteDatasource? matchDatasource,
+  })  : _scheduleDatasource = scheduleDatasource,
+        _matchDatasource = matchDatasource;
 
   final GetMatches _getMatches;
   final LeagueScheduleDatasource? _scheduleDatasource;
+  final MatchRemoteDatasource? _matchDatasource;
 
   List<MatchDisplayData> _displayMatches = [];
   final Map<String, TeamData> teamRegistry = {};
@@ -99,6 +105,42 @@ class MatchProvider extends ChangeNotifier {
       } catch (_) {
         // Skip failed leagues silently
       }
+    }
+    // getSchedule doesn't return numeric team IDs — backfill them from
+    // historical homeEvents data (past 9 months of completed matches).
+    await _fillMissingTeamIds();
+  }
+
+  Future<void> _fillMissingTeamIds() async {
+    final ds = _matchDatasource;
+    if (ds == null) return;
+    try {
+      final now = DateTime.now().toUtc();
+      final ids = await ds.getTeamIds(
+        startDate: now.subtract(const Duration(days: 270)),
+        endDate: now,
+        leagueIds: kLeagueIds.values.toList(),
+      );
+      var changed = false;
+      for (final entry in ids.entries) {
+        final existing = teamRegistry[entry.key];
+        if (existing != null && existing.apiId.isEmpty && entry.value.isNotEmpty) {
+          teamRegistry[entry.key] = TeamData(
+            id: existing.id,
+            mono: existing.mono,
+            name: existing.name,
+            region: existing.region,
+            color1: existing.color1,
+            color2: existing.color2,
+            apiId: entry.value,
+            imageUrl: existing.imageUrl,
+          );
+          changed = true;
+        }
+      }
+      if (changed) notifyListeners();
+    } catch (_) {
+      // Silent failure — roster stays unavailable for affected teams
     }
   }
 
