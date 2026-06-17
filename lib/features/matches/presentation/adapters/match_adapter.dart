@@ -40,6 +40,7 @@ TeamData teamDataFromApi({
   required String name,
   required String leagueSlug,
   required String apiId,
+  String imageUrl = '',
 }) {
   final colors = _knownColors[code];
   final c1 = colors?.$1 ?? _colorFromCode(code);
@@ -52,7 +53,19 @@ TeamData teamDataFromApi({
     color1: c1,
     color2: c2,
     apiId: apiId,
+    imageUrl: imageUrl,
   );
+}
+
+bool _isAcademyTeam(String name) {
+  final n = name.toLowerCase();
+  return n.contains('academy') ||
+      n.contains(' blue') ||
+      n.contains('challengers') ||
+      n.contains('next gen') ||
+      n.contains('reserves') ||
+      n.contains('youth') ||
+      n.endsWith(' b');
 }
 
 /// Converts a sorted list of [Match] from the API into [MatchDisplayData]
@@ -76,8 +89,8 @@ List<MatchDisplayData> adaptMatches(
   bool completedHeaderDone = false;
 
   return sorted.map((m) {
-    // Register teams (skip placeholder TBD entries)
-    if (m.team1Code.isNotEmpty && m.team1Code != 'TBD') {
+    // Register teams (skip TBD placeholders and academy/secondary teams)
+    if (m.team1Code.isNotEmpty && m.team1Code != 'TBD' && !_isAcademyTeam(m.team1Name)) {
       teamRegistry.putIfAbsent(
         m.team1Code,
         () => teamDataFromApi(
@@ -85,10 +98,11 @@ List<MatchDisplayData> adaptMatches(
           name: m.team1Name,
           leagueSlug: m.leagueSlug,
           apiId: m.team1ApiId,
+          imageUrl: m.team1ImageUrl,
         ),
       );
     }
-    if (m.team2Code.isNotEmpty && m.team2Code != 'TBD') {
+    if (m.team2Code.isNotEmpty && m.team2Code != 'TBD' && !_isAcademyTeam(m.team2Name)) {
       teamRegistry.putIfAbsent(
         m.team2Code,
         () => teamDataFromApi(
@@ -96,6 +110,7 @@ List<MatchDisplayData> adaptMatches(
           name: m.team2Name,
           leagueSlug: m.leagueSlug,
           apiId: m.team2ApiId,
+          imageUrl: m.team2ImageUrl,
         ),
       );
     }

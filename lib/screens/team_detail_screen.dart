@@ -8,7 +8,7 @@ import '../features/matches/presentation/providers/match_provider.dart';
 import '../features/matches/presentation/providers/roster_provider.dart';
 import '../features/matches/presentation/providers/team_schedule_provider.dart';
 import '../providers/app_provider.dart';
-import '../widgets/hex_logo.dart';
+import '../widgets/team_logo.dart';
 import '../widgets/hex_pattern.dart';
 
 class TeamDetailScreen extends StatelessWidget {
@@ -163,11 +163,7 @@ class _Banner extends StatelessWidget {
                   bottom: 18,
                   child: Column(
                     children: [
-                      HexLogo(
-                        size: 76,
-                        gradient: team.gradient,
-                        mono: team.mono,
-                      ),
+                      TeamLogo(team: team, size: 76),
                       const SizedBox(height: 10),
                       Text(
                         team.name,
@@ -320,20 +316,31 @@ class _RosterTabState extends State<_RosterTab> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final team = context.read<MatchProvider>().teamFor(widget.teamId);
-      context.read<RosterProvider>().fetchRoster(team.apiId);
+      if (team.apiId.isNotEmpty) {
+        context.read<RosterProvider>().fetchRoster(team.apiId);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final team = context.read<MatchProvider>().teamFor(widget.teamId);
+    // Watch MatchProvider so we rebuild when _fetchAllSeasonTeams() fills in apiId.
+    final team = context.watch<MatchProvider>().teamFor(widget.teamId);
     final roster = context.watch<RosterProvider>();
     final status = roster.statusFor(team.apiId);
     final players = roster.playersFor(team.apiId);
 
     if (team.apiId.isEmpty) {
       return _UnavailableTab(icon: Icons.people_outline, message: 'Team not found in API.');
+    }
+
+    // apiId just became available (registry was populated after we were built).
+    if (status == RosterStatus.initial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<RosterProvider>().fetchRoster(team.apiId);
+      });
     }
 
     return switch (status) {
@@ -837,26 +844,39 @@ class _OppBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final matchProvider = context.read<MatchProvider>();
-    final team = matchProvider.teamFor(code);
-    return ClipPath(
-      clipper: _MiniHex(),
-      child: Container(
+    final team = context.read<MatchProvider>().teamFor(code);
+    final url = imageUrl.isNotEmpty ? imageUrl : team.imageUrl;
+    if (url.isNotEmpty) {
+      return SizedBox(
         width: 40,
         height: 40,
-        decoration: BoxDecoration(gradient: team.gradient),
-        alignment: Alignment.center,
-        child: Text(
-          team.mono,
-          style: AppTheme.rajdhani(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => _hexagon(team),
+        ),
+      );
+    }
+    return _hexagon(team);
+  }
+
+  Widget _hexagon(dynamic team) => ClipPath(
+        clipper: _MiniHex(),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(gradient: team.gradient),
+          alignment: Alignment.center,
+          child: Text(
+            team.mono,
+            style: AppTheme.rajdhani(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _MiniHex extends CustomClipper<Path> {
@@ -938,7 +958,7 @@ class _NextMatchTab extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Column(children: [
-                      HexLogo(size: 56, gradient: team.gradient, mono: team.mono),
+                      TeamLogo(team: team, size: 56),
                       const SizedBox(height: 9),
                       Text(
                         team.name,
@@ -959,7 +979,7 @@ class _NextMatchTab extends StatelessWidget {
                   ),
                   Expanded(
                     child: Column(children: [
-                      HexLogo(size: 56, gradient: opp.gradient, mono: opp.mono),
+                      TeamLogo(team: opp, size: 56),
                       const SizedBox(height: 9),
                       Text(
                         opp.name,

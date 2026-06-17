@@ -5,7 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../features/matches/data/datasources/league_schedule_datasource.dart';
 import '../features/matches/presentation/providers/history_provider.dart';
 import '../features/matches/presentation/providers/match_provider.dart';
-import '../widgets/hex_logo.dart';
+import '../widgets/team_logo.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -565,7 +565,7 @@ class _ResultCard extends StatelessWidget {
                       Expanded(
                         child: Row(
                           children: [
-                            HexLogo(size: 40, gradient: team1.gradient, mono: team1.mono),
+                            TeamLogo(team: team1, size: 40),
                             const SizedBox(width: 10),
                             Flexible(
                               child: Text(
@@ -626,7 +626,7 @@ class _ResultCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            HexLogo(size: 40, gradient: team2.gradient, mono: team2.mono),
+                            TeamLogo(team: team2, size: 40),
                           ],
                         ),
                       ),

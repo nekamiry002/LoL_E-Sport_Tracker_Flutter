@@ -5,7 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../features/matches/presentation/providers/match_provider.dart';
 import '../providers/app_provider.dart';
-import '../widgets/hex_logo.dart';
+import '../widgets/team_logo.dart';
 
 class TeamsScreen extends StatefulWidget {
   const TeamsScreen({super.key});
@@ -122,10 +122,10 @@ class _TeamsScreenState extends State<TeamsScreen> {
             child: GridView.builder(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
+                crossAxisCount: 2,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 1.55,
+                childAspectRatio: 1.9,
               ),
               itemCount: teams.length,
               itemBuilder: (_, i) => _TeamCard(team: teams[i]),
@@ -381,7 +381,7 @@ class _TeamCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -424,15 +424,15 @@ class _TeamCard extends StatelessWidget {
                   // Middle: logo + name
                   Row(
                     children: [
-                      HexLogo(size: 32, gradient: team.gradient, mono: team.mono),
-                      const SizedBox(width: 8),
+                      TeamLogo(team: team, size: 26),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           team.name,
                           overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
+                          maxLines: 1,
                           style: AppTheme.rajdhani(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.3,
                           ),
@@ -453,26 +453,31 @@ class _TeamCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          Text('LIVE', style: AppTheme.rajdhani(
+                          const Text('LIVE', style: TextStyle(
                             fontSize: 9, fontWeight: FontWeight.w700,
                             letterSpacing: 1, color: AppColors.liveRedLight,
                           )),
                         ] else ...[
                           const Icon(Icons.access_time, size: 9, color: AppColors.textMuted),
                           const SizedBox(width: 3),
-                          Expanded(
+                          Flexible(
                             child: Text(matchInfo,
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                               style: AppTheme.barlow(fontSize: 9, color: AppColors.textMuted),
                             ),
                           ),
                         ],
                         if (opponentCode != null) ...[
-                          const Spacer(),
-                          Text('vs $opponentCode',
-                            style: AppTheme.rajdhani(
-                              fontSize: 9, fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text('vs $opponentCode',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: AppTheme.rajdhani(
+                                fontSize: 9, fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ),
                         ],
@@ -480,6 +485,8 @@ class _TeamCard extends StatelessWidget {
                     )
                   else
                     Text('No upcoming match',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                       style: AppTheme.barlow(fontSize: 9, color: AppColors.textSubtle),
                     ),
                 ],

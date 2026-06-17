@@ -5,7 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../features/matches/presentation/providers/match_provider.dart';
 import '../providers/app_provider.dart';
-import '../widgets/hex_logo.dart';
+import '../widgets/team_logo.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
@@ -187,7 +187,7 @@ class _FavoriteCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
                 child: Row(
                   children: [
-                    HexLogo(size: 50, gradient: team.gradient, mono: team.mono),
+                    TeamLogo(team: team, size: 50),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(

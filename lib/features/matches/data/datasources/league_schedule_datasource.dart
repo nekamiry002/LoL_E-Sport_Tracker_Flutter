@@ -78,11 +78,26 @@ class ScheduleTeam {
     required this.name,
     required this.leagueName,
     required this.leagueSlug,
+    this.imageUrl = '',
+    this.apiId = '',
   });
   final String code;
   final String name;
   final String leagueName;
   final String leagueSlug;
+  final String imageUrl;
+  final String apiId;
+}
+
+bool _isAcademyTeam(String name) {
+  final n = name.toLowerCase();
+  return n.contains('academy') ||
+      n.contains(' blue') ||
+      n.contains('challengers') ||
+      n.contains('next gen') ||
+      n.contains('reserves') ||
+      n.contains('youth') ||
+      n.endsWith(' b');
 }
 
 class LeagueScheduleDatasource {
@@ -118,12 +133,17 @@ class LeagueScheduleDatasource {
         final code = t['code'] as String? ?? '';
         final name = t['name'] as String? ?? '';
         if (code.isEmpty || code == 'TBD' || seen.contains(code)) continue;
+        if (_isAcademyTeam(name)) continue;
         seen.add(code);
+        final rawId = t['id'] as String? ?? '';
+        final apiId = rawId.contains(':') ? rawId.split(':').last : rawId;
         teams.add(ScheduleTeam(
           code: code,
           name: name,
           leagueName: leagueName.toString(),
           leagueSlug: leagueSlug,
+          imageUrl: t['image'] as String? ?? '',
+          apiId: apiId,
         ));
       }
     }

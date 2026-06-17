@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color;
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../data/mock_data.dart';
@@ -88,7 +89,8 @@ class MatchProvider extends ChangeNotifier {
               code: t.code,
               name: t.name,
               leagueSlug: t.leagueSlug,
-              apiId: '',
+              apiId: t.apiId,
+              imageUrl: t.imageUrl,
             );
             changed = true;
           }
@@ -109,6 +111,17 @@ class MatchProvider extends ChangeNotifier {
     return result;
   }
 
-  TeamData teamFor(String code) =>
-      teamRegistry[code] ?? MockData.team(code);
+  TeamData teamFor(String code) {
+    if (code.isEmpty || code == 'TBD') return _tbdTeam;
+    return teamRegistry[code] ?? MockData.team(code);
+  }
 }
+
+const _tbdTeam = TeamData(
+  id: 'TBD',
+  mono: '?',
+  name: 'TBD',
+  region: '',
+  color1: Color(0xFF4A4A5A),
+  color2: Color(0xFF2A2A38),
+);

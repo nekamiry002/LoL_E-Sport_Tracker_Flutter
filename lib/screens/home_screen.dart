@@ -8,8 +8,7 @@ import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../features/matches/presentation/providers/match_provider.dart';
-import '../widgets/hex_clipper.dart';
-import '../widgets/hex_logo.dart';
+import '../widgets/team_logo.dart';
 import '../widgets/live_pulse_dot.dart';
 
 enum CardStyle { classic, compact, featured }
@@ -536,7 +535,7 @@ class ClassicMatchCard extends StatelessWidget {
                         child: GestureDetector(
                           onTap: onTapTeam1,
                           child: Column(children: [
-                            HexLogo(size: 54, gradient: t1.gradient, mono: t1.mono),
+                            TeamLogo(team: t1, size: 54),
                             const SizedBox(height: 9),
                             Text(
                               t1.name,
@@ -576,7 +575,7 @@ class ClassicMatchCard extends StatelessWidget {
                         child: GestureDetector(
                           onTap: onTapTeam2,
                           child: Column(children: [
-                            HexLogo(size: 54, gradient: t2.gradient, mono: t2.mono),
+                            TeamLogo(team: t2, size: 54),
                             const SizedBox(height: 9),
                             Text(
                               t2.name,
@@ -640,7 +639,7 @@ class CompactMatchCard extends StatelessWidget {
             child: GestureDetector(
               onTap: onTapTeam1,
               child: Row(children: [
-                SmallHexLogo(gradient: t1.gradient, mono: t1.mono),
+                TeamLogo(team: t1, size: 34),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -695,7 +694,7 @@ class CompactMatchCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 9),
-                  SmallHexLogo(gradient: t2.gradient, mono: t2.mono),
+                  TeamLogo(team: t2, size: 34),
                 ],
               ),
             ),
@@ -791,7 +790,7 @@ class FeaturedMatchCard extends StatelessWidget {
                         child: GestureDetector(
                           onTap: onTapTeam1,
                           child: Column(children: [
-                            HexLogo(size: 60, gradient: t1.gradient, mono: t1.mono),
+                            TeamLogo(team: t1, size: 60),
                             const SizedBox(height: 10),
                             Text(
                               t1.name,
@@ -830,7 +829,7 @@ class FeaturedMatchCard extends StatelessWidget {
                         child: GestureDetector(
                           onTap: onTapTeam2,
                           child: Column(children: [
-                            HexLogo(size: 60, gradient: t2.gradient, mono: t2.mono),
+                            TeamLogo(team: t2, size: 60),
                             const SizedBox(height: 10),
                             Text(
                               t2.name,
@@ -1060,29 +1059,3 @@ class StatusPill extends StatelessWidget {
   }
 }
 
-class SmallHexLogo extends StatelessWidget {
-  const SmallHexLogo({super.key, required this.gradient, required this.mono});
-  final Gradient gradient;
-  final String mono;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipPath(
-      clipper: HexClipper(),
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(gradient: gradient),
-        alignment: Alignment.center,
-        child: Text(
-          mono,
-          style: AppTheme.rajdhani(
-            fontWeight: FontWeight.w700,
-            fontSize: 11,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-}

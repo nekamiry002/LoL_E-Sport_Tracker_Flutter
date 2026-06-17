@@ -10,6 +10,7 @@ class TeamData {
     required this.color1,
     required this.color2,
     this.apiId = '',
+    this.imageUrl = '',
   });
 
   final String id;
@@ -19,6 +20,7 @@ class TeamData {
   final Color color1;
   final Color color2;
   final String apiId;
+  final String imageUrl;
 
   Gradient get gradient => RadialGradient(
         center: const Alignment(-0.36, -0.48),
