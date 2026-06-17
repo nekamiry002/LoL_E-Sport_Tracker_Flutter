@@ -20,7 +20,7 @@ class NotificationService {
       requestSoundPermission: false,
     );
     await _plugin.initialize(
-      settings: const InitializationSettings(
+      const InitializationSettings(
         android: android,
         iOS: ios,
         macOS: ios,
@@ -58,12 +58,14 @@ class NotificationService {
     if (fireAt.isBefore(tz.TZDateTime.now(tz.local))) return;
 
     await _plugin.zonedSchedule(
-      id: notifId,
-      title: title,
-      body: body,
-      scheduledDate: fireAt,
-      notificationDetails: _details(),
+      notifId,
+      title,
+      body,
+      fireAt,
+      _details(),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
@@ -73,15 +75,10 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    await _plugin.show(
-      id: notifId,
-      title: title,
-      body: body,
-      notificationDetails: _details(),
-    );
+    await _plugin.show(notifId, title, body, _details());
   }
 
-  Future<void> cancel(int notifId) => _plugin.cancel(id: notifId);
+  Future<void> cancel(int notifId) => _plugin.cancel(notifId);
   Future<void> cancelAll() => _plugin.cancelAll();
 
   Future<List<PendingNotificationRequest>> pending() =>
