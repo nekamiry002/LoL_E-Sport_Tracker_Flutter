@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../core/theme/app_theme.dart';
+import '../features/auth/providers/auth_provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/hex_pattern.dart';
 
@@ -137,7 +138,7 @@ class _AvatarSection extends StatelessWidget {
               _Avatar(),
               const SizedBox(height: 16),
               Text(
-                'SummonerKai',
+                context.watch<AuthProvider>().user?.username ?? '—',
                 style: AppTheme.rajdhani(
                   fontSize: 27,
                   fontWeight: FontWeight.w700,
@@ -232,7 +233,7 @@ class _Avatar extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                'SK',
+                context.watch<AuthProvider>().user?.initials ?? '?',
                 style: AppTheme.rajdhani(
                   fontSize: 40,
                   fontWeight: FontWeight.w700,
@@ -547,6 +548,8 @@ class _SettingsSection extends StatelessWidget {
                       label: 'Log Out',
                       labelColor: AppColors.liveRedLight,
                       showDivider: false,
+                      onTap: () =>
+                          context.read<AuthProvider>().logout(),
                     ),
                   ],
                 ),
