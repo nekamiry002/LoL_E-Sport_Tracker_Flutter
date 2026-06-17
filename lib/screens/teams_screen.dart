@@ -16,6 +16,9 @@ class TeamsScreen extends StatefulWidget {
 
 class _TeamsScreenState extends State<TeamsScreen> {
   String _region = 'ALL';
+  String _search = '';
+  bool _showSearch = false;
+  final _searchController = TextEditingController();
 
   static const _regions = ['ALL', 'LCK', 'LPL', 'LEC', 'LCS'];
 
@@ -28,11 +31,22 @@ class _TeamsScreenState extends State<TeamsScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   List<TeamData> _filtered(Map<String, TeamData> registry) {
-    final all = registry.values.toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
-    if (_region == 'ALL') return all;
-    return all.where((t) => t.region == _region).toList();
+    var all = registry.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+    if (_region != 'ALL') all = all.where((t) => t.region == _region).toList();
+    if (_search.isNotEmpty) {
+      final q = _search.toLowerCase();
+      all = all.where((t) =>
+        t.name.toLowerCase().contains(q) || t.id.toLowerCase().contains(q)
+      ).toList();
+    }
+    return all;
   }
 
   @override
@@ -42,7 +56,49 @@ class _TeamsScreenState extends State<TeamsScreen> {
     final teams = _filtered(registry);
     return Column(
       children: [
-        _Header(total: registry.length),
+        _Header(
+          total: registry.length,
+          showSearch: _showSearch,
+          onSearchToggle: () {
+            setState(() {
+              _showSearch = !_showSearch;
+              if (!_showSearch) {
+                _search = '';
+                _searchController.clear();
+              }
+            });
+          },
+        ),
+        if (_showSearch)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              style: AppTheme.rajdhani(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search teams...',
+                hintStyle: AppTheme.rajdhani(color: AppColors.textMuted, fontSize: 14),
+                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 18),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                ),
+              ),
+              onChanged: (v) => setState(() => _search = v),
+            ),
+          ),
         _RegionFilter(
           regions: _regions,
           selected: _region,
@@ -59,16 +115,21 @@ class _TeamsScreenState extends State<TeamsScreen> {
             ),
           )
         else Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.55,
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            backgroundColor: const Color(0xFF1A1A2E),
+            onRefresh: () => matchProvider.fetchMatches(),
+            child: GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.55,
+              ),
+              itemCount: teams.length,
+              itemBuilder: (_, i) => _TeamCard(team: teams[i]),
             ),
-            itemCount: teams.length,
-            itemBuilder: (_, i) => _TeamCard(team: teams[i]),
           ),
         ),
       ],
@@ -79,8 +140,14 @@ class _TeamsScreenState extends State<TeamsScreen> {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.total});
+  const _Header({
+    required this.total,
+    required this.showSearch,
+    required this.onSearchToggle,
+  });
   final int total;
+  final bool showSearch;
+  final VoidCallback onSearchToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -112,18 +179,27 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.groups_outlined,
-              color: AppColors.textSecondary,
-              size: 20,
+          GestureDetector(
+            onTap: onSearchToggle,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: showSearch
+                    ? AppColors.primary.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.04),
+                border: Border.all(
+                  color: showSearch
+                      ? AppColors.primary.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.07),
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                showSearch ? Icons.close : Icons.search,
+                color: showSearch ? AppColors.primary : AppColors.textSecondary,
+                size: 20,
+              ),
             ),
           ),
         ],

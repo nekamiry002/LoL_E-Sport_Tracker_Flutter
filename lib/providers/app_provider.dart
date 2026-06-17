@@ -1,6 +1,8 @@
 import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../features/favorites/domain/repositories/favorites_repository.dart';
+import '../services/notification_scheduler.dart';
 
 enum AppScreen { home, history, teams, favorites, profile }
 
@@ -67,6 +69,21 @@ class AppProvider extends ChangeNotifier {
       unawaited(_favoritesRepository.add(teamId));
     }
     notifyListeners();
+    unawaited(_syncFavoritesForNotifications());
+  }
+
+  Future<void> _syncFavoritesForNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Persist favorites list for background task (different key format)
+    await prefs.setStringList('favorites', _favorites.toList());
+    final notifStart = prefs.getBool('notif_match_start') ?? true;
+    final notifEnd = prefs.getBool('notif_match_end') ?? true;
+    if (!notifStart && !notifEnd) return;
+    await NotificationScheduler.instance.refresh(
+      favCodes: _favorites,
+      notifStart: notifStart,
+      notifEnd: notifEnd,
+    );
   }
 
   bool isFavorite(String teamId) => _favorites.contains(teamId);

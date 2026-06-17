@@ -6,6 +6,8 @@ import 'features/favorites/favorites_factory.dart';
 import 'providers/app_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/notification_prefs_provider.dart';
+import 'services/notification_service.dart';
+import 'services/background_task.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +22,10 @@ void main() async {
     appProvider.init(),
     notificationPrefs.init(),
     languageProvider.init(),
+    NotificationService.instance.init(),
   ]);
+
+  await registerBackgroundTask();
 
   runApp(App(
     appProvider: appProvider,

@@ -99,22 +99,27 @@ class _MatchList extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 26),
-      itemCount: matches.length,
-      itemBuilder: (context, i) {
-        final m = matches[i];
-        final t1 = provider.teamFor(m.team1Id);
-        final t2 = provider.teamFor(m.team2Id);
-        return _MatchSection(
-          match: m,
-          t1: t1,
-          t2: t2,
-          cardStyle: cardStyle,
-          onTapTeam1: () => onTeamTap(m.team1Id),
-          onTapTeam2: () => onTeamTap(m.team2Id),
-        );
-      },
+    return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: const Color(0xFF1A1A2E),
+      onRefresh: () => provider.fetchMatches(),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 26),
+        itemCount: matches.length,
+        itemBuilder: (context, i) {
+          final m = matches[i];
+          final t1 = provider.teamFor(m.team1Id);
+          final t2 = provider.teamFor(m.team2Id);
+          return _MatchSection(
+            match: m,
+            t1: t1,
+            t2: t2,
+            cardStyle: cardStyle,
+            onTapTeam1: () => onTeamTap(m.team1Id),
+            onTapTeam2: () => onTeamTap(m.team2Id),
+          );
+        },
+      ),
     );
   }
 }

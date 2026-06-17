@@ -17,6 +17,9 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   String _filter = 'ALL';
   DateTimeRange? _dateRange;
+  String _search = '';
+  bool _showSearch = false;
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -27,6 +30,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         provider.fetchHistory();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickDateRange() async {
@@ -72,6 +81,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
             !d.isAfter(DateTime(end.year, end.month, end.day, 23, 59, 59));
       }).toList();
     }
+    if (_search.isNotEmpty) {
+      final q = _search.toLowerCase();
+      list = list.where((m) =>
+        m.team1Name.toLowerCase().contains(q) ||
+        m.team2Name.toLowerCase().contains(q) ||
+        m.team1Code.toLowerCase().contains(q) ||
+        m.team2Code.toLowerCase().contains(q)
+      ).toList();
+    }
     return list;
   }
 
@@ -91,9 +109,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _Header(
           count: filtered.length,
           hasDateFilter: _dateRange != null,
+          showSearch: _showSearch,
           onCalendarTap: _pickDateRange,
           onClearDate: () => setState(() => _dateRange = null),
+          onSearchToggle: () => setState(() {
+            _showSearch = !_showSearch;
+            if (!_showSearch) {
+              _search = '';
+              _searchController.clear();
+            }
+          }),
         ),
+        if (_showSearch)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              style: AppTheme.rajdhani(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search teams...',
+                hintStyle: AppTheme.rajdhani(color: AppColors.textMuted, fontSize: 14),
+                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 18),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                ),
+              ),
+              onChanged: (v) => setState(() => _search = v),
+            ),
+          ),
         _LeagueFilter(
           leagues: leagues,
           selected: _filter,
@@ -129,7 +185,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
             HistoryStatus.success when filtered.isEmpty =>
               const _EmptyState(),
             HistoryStatus.success =>
-              _MatchList(groups: _dateGroups(filtered), matches: filtered),
+              RefreshIndicator(
+                color: AppColors.primary,
+                backgroundColor: const Color(0xFF1A1A2E),
+                onRefresh: () => provider.fetchHistory(),
+                child: _MatchList(groups: _dateGroups(filtered), matches: filtered),
+              ),
           },
         ),
       ],
@@ -143,13 +204,17 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.count,
     required this.hasDateFilter,
+    required this.showSearch,
     required this.onCalendarTap,
     required this.onClearDate,
+    required this.onSearchToggle,
   });
   final int count;
   final bool hasDateFilter;
+  final bool showSearch;
   final VoidCallback onCalendarTap;
   final VoidCallback onClearDate;
+  final VoidCallback onSearchToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -181,45 +246,73 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: hasDateFilter ? onClearDate : onCalendarTap,
-            child: Stack(
-              children: [
-                Container(
+          Row(
+            children: [
+              GestureDetector(
+                onTap: onSearchToggle,
+                child: Container(
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: hasDateFilter
+                    color: showSearch
                         ? AppColors.primary.withValues(alpha: 0.15)
                         : Colors.white.withValues(alpha: 0.04),
                     border: Border.all(
-                      color: hasDateFilter
-                          ? AppColors.primary.withValues(alpha: 0.6)
+                      color: showSearch
+                          ? AppColors.primary.withValues(alpha: 0.5)
                           : Colors.white.withValues(alpha: 0.07),
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    hasDateFilter ? Icons.close : Icons.calendar_today_outlined,
-                    color: hasDateFilter ? AppColors.primary : AppColors.textSecondary,
+                    showSearch ? Icons.close : Icons.search,
+                    color: showSearch ? AppColors.primary : AppColors.textSecondary,
                     size: 18,
                   ),
                 ),
-                if (hasDateFilter)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: hasDateFilter ? onClearDate : onCalendarTap,
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: hasDateFilter
+                            ? AppColors.primary.withValues(alpha: 0.15)
+                            : Colors.white.withValues(alpha: 0.04),
+                        border: Border.all(
+                          color: hasDateFilter
+                              ? AppColors.primary.withValues(alpha: 0.6)
+                              : Colors.white.withValues(alpha: 0.07),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        hasDateFilter ? Icons.close : Icons.calendar_today_outlined,
+                        color: hasDateFilter ? AppColors.primary : AppColors.textSecondary,
+                        size: 18,
                       ),
                     ),
-                  ),
-              ],
-            ),
+                    if (hasDateFilter)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
